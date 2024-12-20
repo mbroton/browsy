@@ -4,8 +4,6 @@
 
 **browser-task** is a simple starter kit for executing browser automation tasks via HTTP requests. It uses Playwright for browser interactions and a lightweight SQLite-based queue for task management, making it easy to get started without requiring external databases or message brokers.
 
-**Note:** This project is best suited for low to moderate workloads due to the inherent database locking with SQLite when workers fetch tasks from the queue.
-
 ## Why browser-task?
 
 * **🛠 Self-Contained:** No need for PostgreSQL, Kafka, or RabbitMQ—just run it locally or in a container.
