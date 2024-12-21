@@ -45,6 +45,7 @@ async def worker_loop(
                     await asyncio.sleep(_JOB_POLL_INTERVAL)
                     continue
 
+                last_heartbeat = timeref
                 logger.info(f"Starting job {job.type!r} (ID: {job.id})")
 
                 try:
