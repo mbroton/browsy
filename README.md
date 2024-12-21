@@ -14,6 +14,8 @@
 
 * **📋 Persistent Queue:** SQLite ensures tasks persist even if the server or workers restart, providing ACID compliance without external dependencies.
 
+* **🏗️ Production Features:** Includes graceful shutdown, comprehensive error handling, automatic browser cleanup, and structured logging out of the box.
+
 
 ## Use Cases
 
