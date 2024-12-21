@@ -3,9 +3,9 @@ from typing import Annotated
 from base64 import b64encode
 
 from fastapi import FastAPI, Depends, HTTPException
-from pydantic import BaseModel, HttpUrl, field_validator
+from pydantic import BaseModel, field_validator
 
-from app import data
+from app import data, jobs
 
 
 @asynccontextmanager
@@ -32,16 +32,10 @@ async def get_db():
         await conn.close()
 
 
-class JobRequestBase(BaseModel):
-    type: data.JobType
-
-
-class URLJobRequest(JobRequestBase):
-    url: HttpUrl
-
-
-class HTMLJobRequest(JobRequestBase):
-    html: str
+class JobRequest(BaseModel):
+    type: jobs.JobType
+    source_type: jobs.JobSourceType
+    source: str
 
 
 class JobOutput(data.DBOutput):
@@ -56,27 +50,15 @@ class JobOutput(data.DBOutput):
         return b64encode(value).decode()
 
 
-@app.post("/job", response_model=data.DBJob)
+@app.post("/jobs", response_model=data.DBJob)
 async def create_job(
-    r: URLJobRequest | HTMLJobRequest,
+    r: JobRequest,
     db_conn: Annotated[data.AsyncConnection, Depends(get_db)],
 ):
-    if isinstance(r, URLJobRequest):
-        job = await data.create_job(
-            db_conn, r.type, data.JobSourceType.URL, str(r.url)
-        )
-
-    elif isinstance(r, HTMLJobRequest):
-        job = await data.create_job(
-            db_conn, r.type, data.JobSourceType.HTML, r.html
-        )
-    else:
-        raise HTTPException(400)
-
-    return job
+    return await data.create_job(db_conn, r.type, r.source_type, r.source)
 
 
-@app.get("/job/{job_id}", response_model=data.DBJob)
+@app.get("/jobs/{job_id}", response_model=data.DBJob)
 async def get_job_by_id(
     job_id: int, db_conn: Annotated[data.AsyncConnection, Depends(get_db)]
 ):
@@ -87,7 +69,7 @@ async def get_job_by_id(
     return job
 
 
-@app.get("/job/{job_id}/result")
+@app.get("/jobs/{job_id}/result", response_model=JobOutput)
 async def get_job_result_by_job_id(
     job_id: int, db_conn: Annotated[data.AsyncConnection, Depends(get_db)]
 ):
@@ -95,9 +77,9 @@ async def get_job_result_by_job_id(
     if not job:
         raise HTTPException(404, "Job not found")
 
-    if job.status in (data.JobStatus.PENDING, data.JobStatus.IN_PROGRESS):
+    if job.status in (jobs.JobStatus.PENDING, jobs.JobStatus.IN_PROGRESS):
         raise HTTPException(404, "Job is not finished yet")
-    if job.status == data.JobStatus.FAILED:
+    if job.status == jobs.JobStatus.FAILED:
         raise HTTPException(500, "Job failed")
 
     job_result = await data.get_job_result_by_job_id(db_conn, job_id)
