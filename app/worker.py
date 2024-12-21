@@ -12,7 +12,7 @@ from playwright.async_api import (
 import playwright._impl._errors
 import playwright.async_api
 
-from app import data, jobs
+from app import jobs, database
 
 _JOB_POLL_INTERVAL = 5
 _HEARTBEAT_LOG_INTERVAL = 600
@@ -28,7 +28,7 @@ logger = logging.getLogger("master")
 
 async def worker_loop(
     p: PlaywrightContextManager,
-    conn: data.AsyncConnection,
+    conn: database.AsyncConnection,
     name: str,
 ) -> None:
     log = logging.getLogger(name)
@@ -45,7 +45,7 @@ async def worker_loop(
             timeref = time.monotonic()
 
             try:
-                job = await data.get_next_job(conn, worker=name)
+                job = await database.get_next_job(conn, worker=name)
                 if not job:
                     if timeref - last_heartbeat >= _HEARTBEAT_LOG_INTERVAL:
                         log.info("Worker is alive and polling for jobs")
@@ -69,7 +69,9 @@ async def worker_loop(
                     log.error(f"Job interrupted, marking {job.id} as failed.")
                     await _cancel_task(current_job_task)
                     job.status = jobs.JobStatus.FAILED
-                    await data.update_job_status(conn, job.id, job.status, None)
+                    await database.update_job_status(
+                        conn, job.id, job.status, None
+                    )
                     shutdown = True
                     break
 
@@ -81,7 +83,7 @@ async def worker_loop(
                     log.info(f"Job {job.id} is done.")
                     job.status = jobs.JobStatus.DONE
 
-                await data.update_job_status(
+                await database.update_job_status(
                     conn,
                     job.id,
                     job.status,
@@ -128,7 +130,7 @@ def _get_random_chars(length: int) -> str:
 
 
 async def start_worker(name: str) -> None:
-    conn = await data.create_connection()
+    conn = await database.create_connection()
     try:
         async with async_playwright() as p:
             await worker_loop(p, conn, name)

@@ -5,7 +5,7 @@ from base64 import b64encode
 from fastapi import FastAPI, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 
-from app import data, jobs
+from app import jobs, database
 
 
 _JOBS_DEFS: dict[str, type[jobs.BaseJob]]
@@ -16,10 +16,10 @@ async def lifespan(*_):
     global _JOBS_DEFS
     _JOBS_DEFS = jobs.collect_jobs_defs()
 
-    conn = await data.create_connection()
+    conn = await database.create_connection()
 
     try:
-        await data.init_db(conn)
+        await database.init_db(conn)
     finally:
         await conn.close()
 
@@ -30,7 +30,7 @@ app = FastAPI(lifespan=lifespan)
 
 
 async def get_db():
-    conn = await data.create_connection()
+    conn = await database.create_connection()
 
     try:
         yield conn
@@ -43,7 +43,7 @@ class JobRequest(BaseModel):
     input: dict
 
 
-class JobOutput(data.DBOutput):
+class JobOutput(database.DBOutput):
     output: str
 
     @field_validator("output", mode="before")
@@ -55,24 +55,26 @@ class JobOutput(data.DBOutput):
         return b64encode(value).decode()
 
 
-@app.post("/jobs", response_model=data.DBJob)
+@app.post("/jobs", response_model=database.DBJob)
 async def create_job(
     r: JobRequest,
-    db_conn: Annotated[data.AsyncConnection, Depends(get_db)],
+    db_conn: Annotated[database.AsyncConnection, Depends(get_db)],
 ):
     if r.name not in _JOBS_DEFS:
         raise HTTPException(400, "Job with that name is not defined.")
 
     input_obj = _JOBS_DEFS[r.name].model_validate(r.input)
 
-    return await data.create_job(db_conn, r.name, input_obj.model_dump_json())
+    return await database.create_job(
+        db_conn, r.name, input_obj.model_dump_json()
+    )
 
 
-@app.get("/jobs/{job_id}", response_model=data.DBJob)
+@app.get("/jobs/{job_id}", response_model=database.DBJob)
 async def get_job_by_id(
-    job_id: int, db_conn: Annotated[data.AsyncConnection, Depends(get_db)]
+    job_id: int, db_conn: Annotated[database.AsyncConnection, Depends(get_db)]
 ):
-    job = await data.get_job_by_id(db_conn, job_id)
+    job = await database.get_job_by_id(db_conn, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
 
@@ -81,9 +83,9 @@ async def get_job_by_id(
 
 @app.get("/jobs/{job_id}/result", response_model=JobOutput)
 async def get_job_result_by_job_id(
-    job_id: int, db_conn: Annotated[data.AsyncConnection, Depends(get_db)]
+    job_id: int, db_conn: Annotated[database.AsyncConnection, Depends(get_db)]
 ):
-    job = await data.get_job_by_id(db_conn, job_id)
+    job = await database.get_job_by_id(db_conn, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
 
@@ -94,7 +96,7 @@ async def get_job_result_by_job_id(
     if job.status == jobs.JobStatus.FAILED:
         raise HTTPException(500, "Job failed")
 
-    job_result = await data.get_job_result_by_job_id(db_conn, job_id)
+    job_result = await database.get_job_result_by_job_id(db_conn, job_id)
     if job_result is None:
         raise HTTPException(500, "Job finished, but there's no result")
 
