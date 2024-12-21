@@ -6,11 +6,24 @@
 
 ## Why browser-task?
 
-* **🛠 Self-Contained:** No need for PostgreSQL, Kafka, or RabbitMQ—just run it locally or in a container.
+* **🔌 Simple HTTP API:** Clean API for submitting tasks, checking status, and retrieving results. Perfect for integration into existing workflows.
 
-* **🌐 Browser Automation Ready:** Execute tasks like web scraping, form submissions, and testing workflows with Playwright.
+* **🌐 Browser Automation Ready:** Execute tasks like screenshot generation, PDF rendering, HTML previews or web scraping with Playwright. Supports both URL and raw HTML inputs.
 
-* **📋 Persistent Queue:** SQLite ensures tasks persist even if the server or workers restart.
+* **🛠 Self-Contained:** No need for PostgreSQL, Redis, or message queues—just a lightweight, independent service that runs locally or in a container.
+
+* **📋 Persistent Queue:** SQLite ensures tasks persist even if the server or workers restart, providing ACID compliance without external dependencies.
+
+
+## Use Cases
+
+* **Screenshot generation:** send a URL or raw HTML to the service and get a screenshot of the rendered page **(included in the template)**.
+
+* **PDF Rendering:** submit a URL or HTML payload to generate and download a PDF of the page **(included in the template)**.
+
+* **Basic Web Scraping:** extract data from a webpage, such as text or metadata.
+
+* **Static HTML Previews:** convert raw HTML input into rendered page previews for QA or content review.
 
 
 ## How It Works
@@ -24,20 +37,7 @@
 
 ## Limitations
 
-* **🐢 Not Optimized for High Throughput:** The SQLite queue may introduce performance bottlenecks under heavy workloads due to database locking during task retrieval.
-
 * **💼 Designed for Simplicity:** Ideal for small-scale or personal projects but not intended for large, distributed systems.
-
-
-## Use Cases
-
-* **Screenshot generation:** send a URL or raw HTML to the service and get a screenshot of the rendered page **(included in the template)**.
-
-* **PDF Rendering:** submit a URL or HTML payload to generate and download a PDF of the page **(included in the template)**.
-
-* **Basic Web Scraping:** extract data from a webpage, such as text or metadata.
-
-* **Static HTML Previews:** convert raw HTML input into rendered page previews for QA or content review.
 
 
 ## Getting Started
