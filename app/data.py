@@ -1,8 +1,9 @@
-from typing import TypeAlias, Literal
+import json
 from datetime import datetime
+from typing import TypeAlias, Literal
 
 import aiosqlite
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app import jobs
 
@@ -13,12 +14,12 @@ _DB_FILE = "database.sqlite3"
 _INIT_SQL = """
 CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    input TEXT NOT NULL CHECK(json_valid(input)),
     status TEXT NOT NULL,
-    source_type TEXT NOT NULL,
-    source TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP
+    created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now')),
+    updated_at DATETIME,
+    worker TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 
@@ -33,20 +34,22 @@ CREATE INDEX IF NOT EXISTS idx_outputs_job_id ON outputs(job_id);
 
 
 class DBJob(BaseModel):
-    """Represents a job record from the database.
-
-    Note: The 'source' field is intentionally excluded from this model."""
+    """Represents a job record from the database."""
 
     id: int
-    type: jobs.JobType
+    name: str
+    input: dict
     status: jobs.JobStatus
-    source_type: jobs.JobSourceType
     created_at: datetime
     updated_at: datetime | None
+    worker: str | None
 
-
-class DBJobFull(DBJob):
-    source: str
+    @field_validator("input", mode="before")
+    @classmethod
+    def json_str_output(cls, v: str | dict) -> dict:
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
 
 
 class DBOutput(BaseModel):
@@ -71,26 +74,25 @@ async def init_db(conn: AsyncConnection) -> None:
 
 async def create_job(
     conn: AsyncConnection,
-    type_: jobs.JobType,
-    source_type: jobs.JobSourceType,
-    source: str,
+    name: str,
+    input_json: str,
 ) -> DBJob:
     async with conn.execute(
         """
-        INSERT INTO jobs (type, status, source_type, source)
-        VALUES (?, ?, ?, ?)
-        RETURNING id, created_at, updated_at
+        INSERT INTO jobs (name, input, status)
+        VALUES (?, ?, ?)
+        RETURNING id, created_at, updated_at, worker
         """,
-        (type_, jobs.JobStatus.PENDING, source_type, source),
+        (name, input_json, jobs.JobStatus.PENDING),
     ) as cursor:
         result = await cursor.fetchone()
 
     await conn.commit()
 
     return DBJob(
-        type=type_,
+        name=name,
+        input=input_json,
         status=jobs.JobStatus.PENDING,
-        source_type=source_type,
         **result,
     )
 
@@ -101,7 +103,7 @@ async def get_job_by_id(
 ) -> DBJob | None:
     async with conn.execute(
         """
-        SELECT id, type, status, source_type, created_at, updated_at
+        SELECT id, name, input, status, created_at, updated_at, worker
         FROM jobs
         WHERE id = ?
         """,
@@ -129,13 +131,13 @@ async def get_job_result_by_job_id(
     return DBOutput(**result) if result else None
 
 
-async def get_next_job(conn: AsyncConnection) -> DBJobFull | None:
+async def get_next_job(conn: AsyncConnection, worker: str) -> DBJob | None:
     # Acquires a reserved lock, blocking other write transactions
     await conn.execute("BEGIN IMMEDIATE")
 
     async with conn.execute(
         f"""
-        SELECT id, type, status, source_type, source, created_at, updated_at
+        SELECT id, name, input, status, created_at, updated_at, worker
         FROM jobs
         WHERE status = '{jobs.JobStatus.PENDING.value}'
         ORDER BY created_at ASC
@@ -149,18 +151,19 @@ async def get_next_job(conn: AsyncConnection) -> DBJobFull | None:
         await conn.rollback()
         return None
 
-    db_job = DBJobFull(**result)
+    db_job = DBJob(**result)
 
     await conn.execute(
-        """
+        f"""
         UPDATE jobs
-        SET status = 'in_progress', updated_at = DATETIME('now')
+        SET status = '{jobs.JobStatus.IN_PROGRESS.value}', updated_at = DATETIME('now'), worker = ?
         WHERE id = ?
         """,
-        (db_job.id,),
+        (worker, db_job.id),
     )
     await conn.commit()
     db_job.status = jobs.JobStatus.IN_PROGRESS
+    db_job.worker = worker
 
     return db_job
 

@@ -8,8 +8,14 @@ from pydantic import BaseModel, field_validator
 from app import data, jobs
 
 
+_JOBS_DEFS: dict[str, type[jobs.BaseJob]]
+
+
 @asynccontextmanager
 async def lifespan(*_):
+    global _JOBS_DEFS
+    _JOBS_DEFS = jobs.collect_jobs_defs()
+
     conn = await data.create_connection()
 
     try:
@@ -33,9 +39,8 @@ async def get_db():
 
 
 class JobRequest(BaseModel):
-    type: jobs.JobType
-    source_type: jobs.JobSourceType
-    source: str
+    name: str
+    input: dict
 
 
 class JobOutput(data.DBOutput):
@@ -55,7 +60,12 @@ async def create_job(
     r: JobRequest,
     db_conn: Annotated[data.AsyncConnection, Depends(get_db)],
 ):
-    return await data.create_job(db_conn, r.type, r.source_type, r.source)
+    if r.name not in _JOBS_DEFS:
+        raise HTTPException(400, "Job with that name is not defined.")
+
+    input_obj = _JOBS_DEFS[r.name].model_validate(r.input)
+
+    return await data.create_job(db_conn, r.name, input_obj.model_dump_json())
 
 
 @app.get("/jobs/{job_id}", response_model=data.DBJob)
@@ -77,8 +87,10 @@ async def get_job_result_by_job_id(
     if not job:
         raise HTTPException(404, "Job not found")
 
-    if job.status in (jobs.JobStatus.PENDING, jobs.JobStatus.IN_PROGRESS):
-        raise HTTPException(404, "Job is not finished yet")
+    if job.status == jobs.JobStatus.PENDING:
+        raise HTTPException(404, "Job is pending")
+    if job.status == jobs.JobStatus.IN_PROGRESS:
+        raise HTTPException(404, "Job is in progress")
     if job.status == jobs.JobStatus.FAILED:
         raise HTTPException(500, "Job failed")
 
