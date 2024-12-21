@@ -50,7 +50,7 @@ async def worker_loop(
                     continue
 
                 last_heartbeat = timeref
-                log.info(f"Starting job {job.type!r} (ID: {job.id})")
+                log.info(f"Starting job {str(job.type)!r} (ID: {job.id})")
 
                 try:
                     async with await browser.new_context() as ctx:
