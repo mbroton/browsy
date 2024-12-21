@@ -15,6 +15,8 @@ from app import data, jobs
 _JOB_POLL_INTERVAL = 5
 _HEARTBEAT_LOG_INTERVAL = 600
 
+_JOBS_DEFS = jobs.collect_jobs_defs()
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -25,8 +27,9 @@ logger = logging.getLogger("master")
 async def worker_loop(
     p: PlaywrightContextManager,
     conn: data.AsyncConnection,
-    log: logging.Logger,
+    name: str,
 ) -> None:
+    log = logging.getLogger(name)
     log.info("Ready to accept jobs.")
     shutdown = False
     last_heartbeat = time.monotonic()
@@ -40,7 +43,7 @@ async def worker_loop(
             timeref = time.monotonic()
 
             try:
-                job = await data.get_next_job(conn)
+                job = await data.get_next_job(conn, worker=name)
                 if not job:
                     if timeref - last_heartbeat >= _HEARTBEAT_LOG_INTERVAL:
                         log.info("Worker is alive and polling for jobs")
@@ -50,15 +53,13 @@ async def worker_loop(
                     continue
 
                 last_heartbeat = timeref
-                log.info(f"Starting job {str(job.type)!r} (ID: {job.id})")
+                log.info(f"Starting job {job.name!r} (ID: {job.id})")
 
                 try:
                     async with await browser.new_context() as ctx:
                         async with await ctx.new_page() as page:
                             current_job_task = asyncio.create_task(
-                                jobs.JOB_TYPE_TO_FUNC[job.type](
-                                    page, job.source_type, job.source
-                                )
+                                _JOBS_DEFS[job.name](**job.input).execute(page)
                             )
                             output = await current_job_task
 
@@ -120,11 +121,10 @@ async def _shutdown_browser(
 
 
 async def start_worker(name: str) -> None:
-    lg = logging.getLogger(name)
     conn = await data.create_connection()
     try:
         async with async_playwright() as p:
-            await worker_loop(p, conn, lg)
+            await worker_loop(p, conn, name)
     finally:
         await conn.close()
 

@@ -1,14 +1,16 @@
+from typing import Literal
+
 from playwright.async_api import Page
 
 from app.jobs import BaseJob
 
 
-class ScreenshotJob(BaseJob):
-    NAME = "screenshot"
+class PDFJob(BaseJob):
+    NAME = "pdf"
 
     url: str | None = None
     html: str | None = None
-    full_page: bool = False
+    emulate_media: Literal["null", "print", "screen"] | None = None
 
     async def execute(self, page: Page) -> bytes:
         if self.url:
@@ -16,4 +18,7 @@ class ScreenshotJob(BaseJob):
         elif self.html:
             await page.set_content(self.html)
 
-        return await page.screenshot(full_page=self.full_page)
+        if self.emulate_media:
+            await page.emulate_media(self.emulate_media)
+
+        return await page.pdf()
