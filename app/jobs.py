@@ -56,6 +56,6 @@ class JobType(str, Enum):
 
 
 JOB_TYPE_TO_FUNC: dict[JobType, _JobFuncType] = {
-    JobType.SCREENSHOT: get_screenshot_job,  # type: ignore
-    JobType.PDF: get_pdf_job,  # type: ignore
+    JobType.SCREENSHOT: get_screenshot_job,
+    JobType.PDF: get_pdf_job,
 }
