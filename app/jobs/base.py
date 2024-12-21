@@ -14,8 +14,6 @@ class JobStatus(str, Enum):
 
 
 def collect_jobs_defs():
-    """Collects jobs definitions from inside this package into
-    specified format"""
     import pkgutil
     import importlib
     import inspect
