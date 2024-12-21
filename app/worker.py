@@ -2,7 +2,11 @@ import asyncio
 import logging
 import time
 
-from playwright.async_api import async_playwright, PlaywrightContextManager
+from playwright.async_api import (
+    async_playwright,
+    PlaywrightContextManager,
+    Browser,
+)
 import playwright._impl._errors
 import playwright.async_api
 
@@ -21,13 +25,13 @@ logger = logging.getLogger("master")
 async def worker_loop(
     p: PlaywrightContextManager,
     conn: data.AsyncConnection,
-    logger: logging.Logger,
+    log: logging.Logger,
 ) -> None:
-    logger.info("Starting")
+    log.info("Starting")
     shutdown = False
     last_heartbeat = time.monotonic()
-    browser = None
-    current_job_task = None
+    browser: Browser | None = None
+    current_job_task: asyncio.Task | None = None
 
     try:
         browser = await p.chromium.launch(headless=True)
@@ -39,14 +43,14 @@ async def worker_loop(
                 job = await data.get_next_job(conn)
                 if not job:
                     if timeref - last_heartbeat >= _HEARTBEAT_LOG_INTERVAL:
-                        logger.info("Worker is alive and polling for jobs")
+                        log.info("Worker is alive and polling for jobs")
                         last_heartbeat = timeref
 
                     await asyncio.sleep(_JOB_POLL_INTERVAL)
                     continue
 
                 last_heartbeat = timeref
-                logger.info(f"Starting job {job.type!r} (ID: {job.id})")
+                log.info(f"Starting job {job.type!r} (ID: {job.id})")
 
                 try:
                     async with await browser.new_context() as ctx:
@@ -59,26 +63,19 @@ async def worker_loop(
                             output = await current_job_task
 
                 except (asyncio.CancelledError, playwright.async_api.Error):
-                    logger.error(
-                        f"Job interrupted, marking {job.id} as failed."
-                    )
-                    if current_job_task and not current_job_task.done():
-                        current_job_task.cancel()
-                        try:
-                            await current_job_task
-                        except Exception as e:
-                            logger.debug(f"Task cleanup error: {e!r}")
+                    log.error(f"Job interrupted, marking {job.id} as failed.")
+                    await _cancel_task(current_job_task)
                     job.status = jobs.JobStatus.FAILED
                     await data.finish_job(conn, job.id, job.status, None)
                     shutdown = True
                     break
 
                 except Exception:
-                    logger.exception("Job execution failed.")
+                    log.exception("Job execution failed.")
                     job.status = jobs.JobStatus.FAILED
 
                 else:
-                    logger.info(f"Job {job.id} is done.")
+                    log.info(f"Job {job.id} is done.")
                     job.status = jobs.JobStatus.DONE
 
                 await data.finish_job(
@@ -89,23 +86,37 @@ async def worker_loop(
                 )
 
             except asyncio.CancelledError:
-                logger.info("Shutting down worker (no jobs interrupted).")
+                log.info("Shutting down worker (no jobs interrupted).")
                 shutdown = True
                 break
 
     finally:
-        if current_job_task and not current_job_task.done():
-            current_job_task.cancel()
-            try:
-                await current_job_task
-            except Exception as e:
-                logger.debug(f"Task cleanup error: {e!r}")
+        await _cancel_task(current_job_task, log=log)
 
         if browser:
-            try:
-                await asyncio.wait_for(browser.close(), timeout=5.0)
-            except (asyncio.TimeoutError, playwright.async_api.Error) as e:
-                logger.warning(f"Failed to close browser gracefully: {e!r}")
+            await _shutdown_browser(browser, log=log)
+
+
+async def _cancel_task(
+    task: asyncio.Task | None, log: logging.Logger | None = None
+) -> None:
+    log = log or logger
+    if task and not task.done():
+        task.cancel()
+        try:
+            await task
+        except Exception as e:
+            log.debug(f"Canceled task clean up error: {e!r}")
+
+
+async def _shutdown_browser(
+    browser: Browser, timeout: float = 5.0, log: logging.Logger | None = None
+) -> None:
+    log = log or logger
+    try:
+        await asyncio.wait_for(browser.close(), timeout=timeout)
+    except (asyncio.TimeoutError, playwright.async_api.Error) as e:
+        log.warning(f"Failed to close browser gracefully: {e!r}")
 
 
 async def start_worker(name: str) -> None:
