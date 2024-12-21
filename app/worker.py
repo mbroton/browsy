@@ -27,7 +27,7 @@ async def worker_loop(
     conn: data.AsyncConnection,
     log: logging.Logger,
 ) -> None:
-    log.info("Starting")
+    log.info("Ready to accept jobs.")
     shutdown = False
     last_heartbeat = time.monotonic()
     browser: Browser | None = None
