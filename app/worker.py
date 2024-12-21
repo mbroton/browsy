@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import time
+import random
+import string
 
 from playwright.async_api import (
     async_playwright,
@@ -67,7 +69,7 @@ async def worker_loop(
                     log.error(f"Job interrupted, marking {job.id} as failed.")
                     await _cancel_task(current_job_task)
                     job.status = jobs.JobStatus.FAILED
-                    await data.finish_job(conn, job.id, job.status, None)
+                    await data.update_job_status(conn, job.id, job.status, None)
                     shutdown = True
                     break
 
@@ -79,7 +81,7 @@ async def worker_loop(
                     log.info(f"Job {job.id} is done.")
                     job.status = jobs.JobStatus.DONE
 
-                await data.finish_job(
+                await data.update_job_status(
                     conn,
                     job.id,
                     job.status,
@@ -120,6 +122,11 @@ async def _shutdown_browser(
         log.warning(f"Failed to close browser gracefully: {e!r}")
 
 
+def _get_random_chars(length: int) -> str:
+    chars = string.ascii_letters + string.digits
+    return "".join(random.choice(chars) for _ in range(length))
+
+
 async def start_worker(name: str) -> None:
     conn = await data.create_connection()
     try:
@@ -130,7 +137,7 @@ async def start_worker(name: str) -> None:
 
 
 async def main() -> None:
-    await start_worker("worker1")
+    await start_worker(f"worker_{_get_random_chars(8)}")
 
 
 if __name__ == "__main__":

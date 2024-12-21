@@ -168,7 +168,7 @@ async def get_next_job(conn: AsyncConnection, worker: str) -> DBJob | None:
     return db_job
 
 
-async def finish_job(
+async def update_job_status(
     conn: AsyncConnection,
     job_id: int,
     status: Literal[jobs.JobStatus.DONE, jobs.JobStatus.FAILED],
