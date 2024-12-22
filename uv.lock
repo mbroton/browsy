@@ -37,7 +37,7 @@ wheels = [
 ]
 
 [[package]]
-name = "browser-task"
+name = "browserq"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

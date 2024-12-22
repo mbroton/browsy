@@ -1,10 +1,10 @@
 <div align="center">
-  <h1>:performing_arts: browser-task</h1>
+  <h1>:performing_arts: browserq</h1>
 </div>
 
-**browser-task** is a simple starter kit for executing browser automation tasks via HTTP requests. It uses Playwright for browser interactions and a lightweight SQLite-based queue for task management, making it easy to get started without requiring external databases or message brokers.
+**browserq** is a simple starter kit for executing browser automation tasks via HTTP requests. It uses Playwright for browser interactions and a lightweight SQLite-based queue for task management, making it easy to get started without requiring external databases or message brokers.
 
-## Why browser-task?
+## Why browserq?
 
 * **🔌 Simple HTTP API:** Clean API for submitting tasks, checking status, and retrieving results. Perfect for integration into existing workflows.
 
