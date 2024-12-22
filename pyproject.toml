@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiosqlite>=0.20.0",
+    "click>=8.1.7",
     "fastapi>=0.115.6",
     "playwright>=1.49.1",
     "requests>=2.32.3",
