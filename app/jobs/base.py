@@ -28,6 +28,15 @@ def collect_jobs_defs():
         module = importlib.import_module(f"{package}.{name}")
         for _, obj in inspect.getmembers(module, inspect.isclass):
             if issubclass(obj, BaseJob) and obj != BaseJob:
+                if not hasattr(obj, "NAME"):
+                    raise ValueError(
+                        f"Job class {obj.__name__!r} must define a NAME class variable"
+                    )
+                if obj.NAME in jobs:
+                    raise ValueError(
+                        f"Duplicated job name {obj.NAME!r}. "
+                        "Please ensure all job names are unique."
+                    )
                 jobs[obj.NAME] = obj
 
     return jobs
