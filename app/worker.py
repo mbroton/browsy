@@ -17,8 +17,6 @@ from app import jobs, database
 _JOB_POLL_INTERVAL = 5
 _HEARTBEAT_LOG_INTERVAL = 600
 
-_JOBS_DEFS = jobs.collect_jobs_defs()
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -27,9 +25,10 @@ logger = logging.getLogger("master")
 
 
 async def worker_loop(
-    p: PlaywrightContextManager,
-    conn: database.AsyncConnection,
+    pw_ctx: PlaywrightContextManager,
+    db: database.AsyncConnection,
     name: str,
+    jobs_defs: dict[str, type[jobs.BaseJob]],
 ) -> None:
     log = logging.getLogger(name)
     log.info("Ready to accept jobs.")
@@ -39,13 +38,13 @@ async def worker_loop(
     current_job_task: asyncio.Task | None = None
 
     try:
-        browser = await p.chromium.launch(headless=True)
+        browser = await pw_ctx.chromium.launch(headless=True)
 
         while not shutdown:
             timeref = time.monotonic()
 
             try:
-                job = await database.get_next_job(conn, worker=name)
+                job = await database.get_next_job(db, worker=name)
                 if not job:
                     if timeref - last_heartbeat >= _HEARTBEAT_LOG_INTERVAL:
                         log.info("Worker is alive and polling for jobs")
@@ -61,7 +60,7 @@ async def worker_loop(
                     async with await browser.new_context() as ctx:
                         async with await ctx.new_page() as page:
                             current_job_task = asyncio.create_task(
-                                _JOBS_DEFS[job.name](**job.input).execute(page)
+                                jobs_defs[job.name](**job.input).execute(page)
                             )
                             output = await current_job_task
 
@@ -70,7 +69,7 @@ async def worker_loop(
                     await _cancel_task(current_job_task)
                     job.status = jobs.JobStatus.FAILED
                     await database.update_job_status(
-                        conn, job.id, job.status, None
+                        db, job.id, job.status, None
                     )
                     shutdown = True
                     break
@@ -83,12 +82,8 @@ async def worker_loop(
                     log.info(f"Job {job.id} is done.")
                     job.status = jobs.JobStatus.DONE
 
-                await database.update_job_status(
-                    conn,
-                    job.id,
-                    job.status,
-                    (output if job.status == jobs.JobStatus.DONE else None),
-                )
+                output = output if job.status == jobs.JobStatus.DONE else None
+                await database.update_job_status(db, job.id, job.status, output)
 
             except asyncio.CancelledError:
                 log.info("Shutting down worker (no jobs interrupted).")
@@ -129,17 +124,23 @@ def _get_random_chars(length: int) -> str:
     return "".join(random.choice(chars) for _ in range(length))
 
 
-async def start_worker(name: str) -> None:
+async def start_worker(
+    name: str, jobs_defs: dict[str, type[jobs.BaseJob]]
+) -> None:
     conn = await database.create_connection()
     try:
         async with async_playwright() as p:
-            await worker_loop(p, conn, name)
+            await worker_loop(pw_ctx=p, db=conn, name=name, jobs_defs=jobs_defs)
     finally:
         await conn.close()
 
 
 async def main() -> None:
-    await start_worker(f"worker_{_get_random_chars(8)}")
+    jobs_defs = jobs.collect_jobs_defs()
+
+    await start_worker(
+        name=f"worker_{_get_random_chars(8)}", jobs_defs=jobs_defs
+    )
 
 
 if __name__ == "__main__":

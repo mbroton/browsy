@@ -2,19 +2,15 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 from base64 import b64encode
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
 from app import jobs, database
 
 
-_JOBS_DEFS: dict[str, type[jobs.BaseJob]]
-
-
 @asynccontextmanager
-async def lifespan(*_):
-    global _JOBS_DEFS
-    _JOBS_DEFS = jobs.collect_jobs_defs()
+async def lifespan(app: FastAPI):
+    app.state.JOBS_DEFS = jobs.collect_jobs_defs()
 
     conn = await database.create_connection()
 
@@ -57,13 +53,15 @@ class JobOutput(database.DBOutput):
 
 @app.post("/jobs", response_model=database.DBJob)
 async def create_job(
+    request: Request,
     r: JobRequest,
     db_conn: Annotated[database.AsyncConnection, Depends(get_db)],
 ):
-    if r.name not in _JOBS_DEFS:
+    jobs_defs = request.app.state.JOBS_DEFS
+    if r.name not in jobs_defs:
         raise HTTPException(400, "Job with that name is not defined.")
 
-    input_obj = _JOBS_DEFS[r.name].model_validate(r.input)
+    input_obj = jobs_defs[r.name].model_validate(r.input)
 
     return await database.create_job(
         db_conn, r.name, input_obj.model_dump_json()
