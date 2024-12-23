@@ -35,7 +35,7 @@
 pip install browserq
 ```
 
-### Define example job (see `examples/jobs/`)
+### Define a job
 ```py
 from browserq import BaseJob, Page
 
@@ -56,6 +56,8 @@ class ScreenshotJob(BaseJob):
 ```
 
 In this example `url`, `html` and `full_page` are fields from Pydantic's `BaseModel`. They are used for new jobs validation.
+
+See `examples/jobs/` for more examples.
 
 ### Run the server
 ```
