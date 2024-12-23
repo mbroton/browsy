@@ -28,24 +28,46 @@
 * **Static HTML Previews:** convert raw HTML input into rendered page previews for QA or content review.
 
 
-## How It Works
-
-* **Submit a Task:** Send an HTTP request to queue a browser automation task.
-
-* **Workers Process Tasks:** Workers fetch tasks from the SQLite queue and execute them using Playwright.
-
-* **Result Handling:** Customize worker logic to process results as needed (e.g., save screenshots, scrape data, or trigger other workflows).
-
-
-## Limitations
-
-* **💼 Designed for Simplicity:** Ideal for small-scale or personal projects but not intended for large, distributed systems.
-
-
 ## Getting Started
 
-* (Fork &) Clone the repository
+### Install
+```
+pip install browserq
+```
 
-* Set up and run the server and workers.
+### Define example job (see `examples/jobs/`)
+```py
+from browserq import BaseJob, Page
 
-* Use the provided HTTP API to queue tasks and watch the workers execute them.
+class ScreenshotJob(BaseJob):
+    NAME = "screenshot"
+
+    url: str | None = None
+    html: str | None = None
+    full_page: bool = False
+
+    async def execute(self, page: Page) -> bytes:
+        if self.url:
+            await page.goto(self.url)
+        elif self.html:
+            await page.set_content(self.html)
+
+        return await page.screenshot(full_page=self.full_page)
+```
+
+In this example `url`, `html` and `full_page` are fields from Pydantic's `BaseModel`. They are used for new jobs validation.
+
+### Run the server
+```
+browserq server [file job or directory] [uvicorn params]
+```
+
+for example:
+```
+browserq server jobs/screenshot.py --host 0.0.0.0 --port 8000
+```
+
+### Run worker(s)
+```
+browserq worker [file job or directory]
+```
