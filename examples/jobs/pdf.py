@@ -1,8 +1,6 @@
 from typing import Literal
 
-from playwright.async_api import Page
-
-from src.jobs import BaseJob
+from browserq import BaseJob, Page
 
 
 class PDFJob(BaseJob):

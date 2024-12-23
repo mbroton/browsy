@@ -5,7 +5,7 @@ from typing import TypeAlias, Literal
 import aiosqlite
 from pydantic import BaseModel, field_validator
 
-from src import jobs
+from browserq import jobs
 
 AsyncConnection: TypeAlias = aiosqlite.Connection
 

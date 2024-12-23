@@ -1,16 +1,20 @@
+import os
 from contextlib import asynccontextmanager
 from typing import Annotated
 from base64 import b64encode
+from pathlib import Path
 
 from fastapi import FastAPI, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
-from src import jobs, database
+from browserq import jobs, database
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.JOBS_DEFS = jobs.collect_jobs_defs()
+    jobs_path = os.environ.get("BROWSERQ_JOBS_PATH", str(Path().absolute()))
+
+    app.state.JOBS_DEFS = jobs.collect_jobs_defs(jobs_path)
 
     conn = await database.create_connection()
 
