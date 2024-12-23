@@ -3,8 +3,8 @@ import logging
 import click
 import uvicorn
 
-from app.jobs import collect_jobs_defs
-from app.worker import start_worker, _get_random_chars
+from src.jobs import collect_jobs_defs
+from src.worker import start_worker, _get_random_chars
 
 logging.basicConfig(
     level=logging.INFO,

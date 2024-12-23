@@ -5,7 +5,7 @@ from base64 import b64encode
 from fastapi import FastAPI, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
-from app import jobs, database
+from src import jobs, database
 
 
 @asynccontextmanager

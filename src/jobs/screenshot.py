@@ -1,6 +1,6 @@
 from playwright.async_api import Page
 
-from app.jobs import BaseJob
+from src.jobs import BaseJob
 
 
 class ScreenshotJob(BaseJob):

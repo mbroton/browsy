@@ -18,7 +18,7 @@ def collect_jobs_defs():
     import importlib
     import inspect
     from pathlib import Path
-    from app.jobs import base
+    from src.jobs import base
 
     jobs = {}
     package = base.__package__
