@@ -2,24 +2,10 @@
   <h1>:performing_arts: browserq</h1>
 </div>
 
-**browserq** is a simple starter kit for executing browser automation tasks via HTTP requests. It uses Playwright for browser interactions and a lightweight SQLite-based queue for task management, making it easy to get started without requiring external databases or message brokers.
-
-## Why browserq?
-
-* **🔌 Simple HTTP API:** Clean API for submitting tasks, checking status, and retrieving results. Perfect for integration into existing workflows.
-
-* **🌐 Browser Automation Ready:** Execute tasks like screenshot generation, PDF rendering, HTML previews or web scraping with Playwright. Supports both URL and raw HTML inputs.
-
-* **🛠 Self-Contained:** No need for PostgreSQL, Redis, or message queues—just a lightweight, independent service that runs locally or in a container.
-
-* **📋 Persistent Queue:** SQLite ensures tasks persist even if the server or workers restart, providing ACID compliance without external dependencies.
-
-* **🏗️ Production Features:** Includes graceful shutdown, comprehensive error handling, automatic browser cleanup, and structured logging out of the box.
+Browserq is a lightweight queue system for browser automation tasks. It lets you easily schedule and run operations like screenshots, PDF generation, and web scraping through a simple HTTP API - all without external dependencies.
 
 
 ## Getting Started
-
-![flow](.github/assets/flow.png)
 
 You can run Browserq straight on your machine or spin it up with Docker. Check out the [documentation](https://broton.dev/) for all the details, but below is the quick and easy way to jump right in.
 
@@ -91,3 +77,7 @@ curl -X POST \
     -d '{"name": "pdf", "input": {"url": "https://broton.dev"}}' \
     http://127.0.0.1:8000/jobs
 ```
+
+### Architecture
+
+![flow](.github/assets/flow.png)
