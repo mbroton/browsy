@@ -63,15 +63,16 @@ async def create_job(
     r: JobRequest,
     db_conn: Annotated[database.AsyncConnection, Depends(get_db)],
 ):
-    jobs_defs = request.app.state.JOBS_DEFS
+    jobs_defs: dict[str, type[jobs.BaseJob]] = request.app.state.JOBS_DEFS
     if r.name not in jobs_defs:
         raise HTTPException(400, "Job with that name is not defined.")
 
-    input_obj = jobs_defs[r.name].model_validate(r.input)
+    job = jobs_defs[r.name].model_validate(r.input)
+    is_valid = await job.validate_logic()
+    if not is_valid:
+        raise HTTPException(400, "Job validation failed")
 
-    return await database.create_job(
-        db_conn, r.name, input_obj.model_dump_json()
-    )
+    return await database.create_job(db_conn, r.name, job.model_dump_json())
 
 
 @app.get("/jobs/{job_id}", response_model=database.DBJob)
