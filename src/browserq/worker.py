@@ -1,8 +1,7 @@
 import asyncio
 import logging
 import time
-import random
-import string
+import os
 from pathlib import Path
 
 from playwright.async_api import (
@@ -120,28 +119,18 @@ async def _shutdown_browser(
         log.warning(f"Failed to close browser gracefully: {e!r}")
 
 
-def _get_random_chars(length: int) -> str:
-    chars = string.ascii_letters + string.digits
-    return "".join(random.choice(chars) for _ in range(length))
+async def start_worker(
+    name: str, db_path: str, jobs_path: str | None = None
+) -> None:
+    if not os.path.exists(db_path):
+        raise FileNotFoundError(db_path)
 
-
-async def start_worker(name: str, jobs_path: str | None = None) -> None:
     jobs_path = jobs_path or Path().absolute()
     jobs_defs = jobs.collect_jobs_defs(jobs_path)
-    conn = await database.create_connection()
+    conn = await database.create_connection(db_path)
+
     try:
         async with async_playwright() as p:
             await worker_loop(pw_ctx=p, db=conn, name=name, jobs_defs=jobs_defs)
     finally:
         await conn.close()
-
-
-async def main() -> None:
-    await start_worker(name=f"worker_{_get_random_chars(8)}")
-
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        pass

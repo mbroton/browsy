@@ -9,8 +9,6 @@ from browserq import jobs
 
 AsyncConnection: TypeAlias = aiosqlite.Connection
 
-_DB_FILE = "database.sqlite3"
-
 _INIT_SQL = """
 CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,8 +56,8 @@ class DBOutput(BaseModel):
     output: bytes | None
 
 
-async def create_connection() -> AsyncConnection:
-    conn = await aiosqlite.connect(_DB_FILE)
+async def create_connection(db_path: str) -> AsyncConnection:
+    conn = await aiosqlite.connect(db_path)
     conn.row_factory = aiosqlite.Row
     return conn
 

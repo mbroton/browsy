@@ -7,16 +7,18 @@ from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
-from browserq import jobs, database
+from browserq import jobs, database, DEFAULT_DB_PATH
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    db_path = os.environ.get("BROWSERQ_DB_PATH", DEFAULT_DB_PATH)
     jobs_path = os.environ.get("BROWSERQ_JOBS_PATH", str(Path().absolute()))
 
+    app.state.DB_PATH = db_path
     app.state.JOBS_DEFS = jobs.collect_jobs_defs(jobs_path)
 
-    conn = await database.create_connection()
+    conn = await database.create_connection(db_path)
 
     try:
         await database.init_db(conn)
@@ -29,8 +31,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-async def get_db():
-    conn = await database.create_connection()
+async def get_db(request: Request):
+    conn = await database.create_connection(request.app.state.DB_PATH)
 
     try:
         yield conn
