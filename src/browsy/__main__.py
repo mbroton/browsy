@@ -7,8 +7,8 @@ import random
 import click
 import uvicorn
 
-from browserq import DEFAULT_DB_PATH
-from browserq.worker import start_worker
+from browsy import DEFAULT_DB_PATH
+from browsy.worker import start_worker
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,9 +31,9 @@ def cli():
 )
 @click.argument("uvicorn_args", nargs=-1, type=click.UNPROCESSED)
 def server(jobs: str, db_path: str, uvicorn_args: tuple[str]):
-    os.environ["BROWSERQ_JOBS_PATH"] = jobs
-    os.environ["BROWSERQ_DB_PATH"] = db_path
-    uvicorn.main(["browserq.server:app"] + list(uvicorn_args))
+    os.environ["BROWSY_JOBS_PATH"] = jobs
+    os.environ["BROWSY_DB_PATH"] = db_path
+    uvicorn.main(["browsy.server:app"] + list(uvicorn_args))
 
 
 @cli.command()

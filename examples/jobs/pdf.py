@@ -1,6 +1,6 @@
 from typing import Literal
 
-from browserq import BaseJob, Page
+from browsy import BaseJob, Page
 
 
 class PDFJob(BaseJob):

@@ -7,13 +7,13 @@ from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
-from browserq import jobs, database, DEFAULT_DB_PATH
+from browsy import jobs, database, DEFAULT_DB_PATH
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db_path = os.environ.get("BROWSERQ_DB_PATH", DEFAULT_DB_PATH)
-    jobs_path = os.environ.get("BROWSERQ_JOBS_PATH", str(Path().absolute()))
+    db_path = os.environ.get("BROWSY_DB_PATH", DEFAULT_DB_PATH)
+    jobs_path = os.environ.get("BROWSY_JOBS_PATH", str(Path().absolute()))
 
     app.state.DB_PATH = db_path
     app.state.JOBS_DEFS = jobs.collect_jobs_defs(jobs_path)

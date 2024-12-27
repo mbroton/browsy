@@ -12,7 +12,7 @@ from playwright.async_api import (
 import playwright._impl._errors
 import playwright.async_api
 
-from browserq import jobs, database
+from browsy import jobs, database
 
 _JOB_POLL_INTERVAL = 5
 _HEARTBEAT_LOG_INTERVAL = 600

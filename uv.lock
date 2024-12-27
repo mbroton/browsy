@@ -37,9 +37,9 @@ wheels = [
 ]
 
 [[package]]
-name = "browserq"
+name = "browsy"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
     { name = "click" },

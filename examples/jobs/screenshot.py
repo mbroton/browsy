@@ -1,4 +1,4 @@
-from browserq import BaseJob, Page
+from browsy import BaseJob, Page
 
 
 class ScreenshotJob(BaseJob):
