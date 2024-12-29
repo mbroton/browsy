@@ -5,6 +5,10 @@ ARG VERSION
 
 WORKDIR /worker
 
-RUN apt-get update && apt-get install -y python3 python3-pip
-
 RUN pip install "browsy[worker]==${VERSION}"
+
+RUN adduser --uid 1266 --disabled-password --gecos '' browsyuser && \
+    addgroup --gid 1267 browsygroup && \
+    usermod -a -G browsygroup browsyuser
+
+RUN mkdir -p /data && chown -R browsyuser:browsygroup /data

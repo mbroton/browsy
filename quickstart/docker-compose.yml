@@ -2,26 +2,39 @@ services:
   server:
     image: ghcr.io/mbroton/browsy/server:v0.0.2
     command: browsy server --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    user: browsyuser
     ports:
       - "8000:8000"
     volumes:
       - ${JOBS_PATH:-./jobs}:/server/jobs
-      - browsy_data:/server/data
+      - browsy_data:/data
     environment:
-      - BROWSY_DB_PATH=/server/data/browsy.db
+      - BROWSY_DB_PATH=/data/browsy.db
       - BROWSY_JOBS_PATH=/server/jobs
-    depends_on:
-      - worker
 
   worker:
     image: ghcr.io/mbroton/browsy/worker:v0.0.2
     command: browsy worker
+    restart: unless-stopped
+    user: browsyuser
     volumes:
       - ${JOBS_PATH:-./jobs}:/worker/jobs
-      - browsy_data:/worker/data
+      - browsy_data:/data
+    ipc: host
+    security_opt:
+      - "seccomp=${PWD}/.seccomp_profile.json"
     environment:
-      - BROWSY_DB_PATH=/worker/data/browsy.db
+      - BROWSY_DB_PATH=/data/browsy.db
       - BROWSY_JOBS_PATH=/worker/jobs
+    depends_on:
+      - server
+    healthcheck:
+      test: curl -f http://server:8000/health || exit 1
+      interval: 3s
+      timeout: 5s
+      retries: 3
+      start_period: 1s
 
 volumes:
   browsy_data:
