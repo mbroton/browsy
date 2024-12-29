@@ -1,86 +1,89 @@
 <div align="center">
-  <h1>:performing_arts: browsy</h1>
+  <h1>browsy</h1>
 </div>
 
-**browsy** is a lightweight queue system for browser automation tasks. It lets you easily schedule and run operations like screenshots, PDF generation, and web scraping through a simple HTTP API - all without external dependencies.
+## What is browsy?
 
+browsy is a service that lets you run browser automation tasks without managing browser instances yourself. It provides:
 
-## Getting Started
+- **Simple Job Definition**: Write Playwright-powered automation tasks in Python
+- **HTTP API**: Queue jobs and retrieve results through HTTP endpoints
+- **Docker Ready**: Run everything in containers without worrying about browser dependencies
+- **Queue System**: Jobs are processed in order, with automatic retries and status tracking
+- **Extensible**: Create any browser automation task - from screenshots and PDFs to complex scraping operations
 
-The simplest way to spin browsy up is with Docker Compose. Check out the [documentation](https://broton.dev/) for all the details, but below is the quick and easy way to jump right in.
+Think of it as a way to turn your Playwright scripts into HTTP services that can be called from anywhere.
 
-Here's what you need to do:
-* Install browsy
-* Copy docker-compose.yml
-* Define jobs
-* Run docker compose
-* That's it! Just send requests to queue jobs and grab their results when they're done
+## Quick Start
 
-
-### Quick Start
-
-#### Install browsy
-
-```
+1. Install browsy:
+```bash
 pip install browsy
 ```
 
-#### Copy docker compose
-
-```
-git clone ...
-```
-
-#### Define a job
-
-`jobs/screenshot.py`:
-```py
+2. Define a job (e.g., `jobs/screenshot.py`):
+```python
 from browsy import BaseJob, Page
 
+# Define a job by inheriting from BaseJob (which works like Pydantic's BaseModel)
+# and giving it a unique name
 class ScreenshotJob(BaseJob):
+    # This name will be used to identify the job type when making API calls
     NAME = "screenshot"
 
-    url: str | None = None
-    html: str | None = None
-    full_page: bool = False
+    # Define job parameters
+    # All of these will be automatically parsed from the JSON request
+    url: str | None = None      # URL to take screenshot of
+    html: str | None = None     # Or raw HTML to render
+    full_page: bool = False     # Whether to capture the full scrollable page
 
     async def execute(self, page: Page) -> bytes:
+        # This is where the actual browser automation happens
+        # `page` is a Playwright `Page` object with all its methods available
         if self.url:
             await page.goto(self.url)
         elif self.html:
             await page.set_content(self.html)
-
         return await page.screenshot(full_page=self.full_page)
 
     async def validate_logic(self) -> bool:
-        # Ensure only one target is given, never both
+        # Optional validation method that runs when submitting a new job
+        # Here we check that exactly one of url/html is provided
         if bool(self.url) == bool(self.html):
             return False
-        
         return True
 ```
 
-In this example `url`, `html` and `full_page` are fields from Pydantic's `BaseModel`. They are used for new jobs validation.
-
-#### Run browsy
-
-```
+3. Run browsy:
+```bash
 docker compose up --build
 ```
 
-#### That's it!
-
-### Using browsy
-
-Trigger a job execution:
-```py
+4. Use it:
+```python
 from browsy import BrowsyClient
 
 client = BrowsyClient("http://127.0.0.1")
-job_id = client.add_job("screenshot", {"url": "https://broton.dev", full_page=True})
+job_id = client.add_job("screenshot", {
+    "url": "https://example.com",
+    "full_page": True
+})
 screenshot = client.get_result(job_id=job_id).content
 ```
 
-### Architecture
+## How it works
 
 ![flow](.github/assets/flow.png)
+
+1. You define jobs using Playwright's API
+2. Send job requests through HTTP
+3. Workers execute jobs in Docker containers
+4. Get results when ready
+
+## Documentation
+
+For detailed setup and usage, check out the [documentation](https://broton.dev/).
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
