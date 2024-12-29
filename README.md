@@ -7,21 +7,21 @@
 
 ## Getting Started
 
-You can run browsy straight on your machine or spin it up with Docker. Check out the [documentation](https://broton.dev/) for all the details, but below is the quick and easy way to jump right in.
+The simplest way to spin browsy up is with Docker Compose. Check out the [documentation](https://broton.dev/) for all the details, but below is the quick and easy way to jump right in.
 
 Here's what you need to do:
-* Get browsy installed
-* Create your own jobs or grab some of [my ready-to-use ones]() (screenshot generation, PDF rendering, etc.)
-* Start the server and worker(s) with your jobs
+* Copy docker-compose.yml
+* Define jobs
+* Run docker compose
 * That's it! Just send requests to queue jobs and grab their results when they're done
 
 
 ### Quick Start
 
-#### Install browsy
+#### Copy docker compose
 
 ```
-pip install browsy
+git clone ...
 ```
 
 #### Define a job
@@ -44,38 +44,34 @@ class ScreenshotJob(BaseJob):
             await page.set_content(self.html)
 
         return await page.screenshot(full_page=self.full_page)
+
+    async def validate_logic(self) -> bool:
+        # Ensure only one target is given, never both
+        if bool(self.url) == bool(self.html):
+            return False
+        
+        return True
 ```
 
 In this example `url`, `html` and `full_page` are fields from Pydantic's `BaseModel`. They are used for new jobs validation.
 
-See `examples/jobs/` for more examples.
+#### Run browsy
 
-#### Run FastAPI server
 ```
-browsy server jobs/
+docker compose up --build
 ```
-
-Pass job(s) (file or directory) to let the server know which jobs it can accept and how it can validate inputs.
-
-Additionally, `browsy server` accepts arguments that are directly passed to `uvicorn` e.g. `browsy server jobs/ --host 0.0.0.0 --port 42069`.
-
-#### Run Playwright worker(s)
-```
-browsy worker jobs/
-```
-
-Pass the same job(s) as to the server, to let the worker know how to execute them.
 
 #### That's it!
 
 ### Using browsy
 
 Trigger a job execution:
-```
-curl -X POST \
-    -H "Content-Type: application/json" \
-    -d '{"name": "pdf", "input": {"url": "https://broton.dev"}}' \
-    http://127.0.0.1:8000/jobs
+```py
+from browsy import BrowsyClient
+
+client = BrowsyClient("http://127.0.0.1")
+job_id = client.add_job("screenshot", {"url": "https://broton.dev", full_page=True})
+screenshot = client.get_result(job_id=job_id).content
 ```
 
 ### Architecture
