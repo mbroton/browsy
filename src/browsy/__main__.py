@@ -43,7 +43,7 @@ def worker(name: str | None):
             start_worker(
                 name=worker_name,
                 db_path=os.environ["BROWSY_DB_PATH"],
-                jobs_path=["BROWSY_JOBS_PATH"],
+                jobs_path=os.environ["BROWSY_JOBS_PATH"],
             )
         )
     except KeyboardInterrupt:
