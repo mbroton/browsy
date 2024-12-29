@@ -1,11 +1,8 @@
 FROM python:3.12-slim
+ARG VERSION
 
-WORKDIR /app
+LABEL org.opencontainers.image.source https://github.com/mbroton/browsy
 
-COPY requirements.txt .
+WORKDIR /server
 
-RUN pip install -r requirements.txt
-
-COPY . .
-
-CMD []
+RUN pip install "browsy[server]==${VERSION}"
