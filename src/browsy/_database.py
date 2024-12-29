@@ -5,7 +5,7 @@ from typing import TypeAlias, Literal
 import aiosqlite
 from pydantic import BaseModel, field_validator
 
-from browsy import jobs
+from browsy import _jobs
 
 AsyncConnection: TypeAlias = aiosqlite.Connection
 
@@ -37,7 +37,7 @@ class DBJob(BaseModel):
     id: int
     name: str
     input: dict
-    status: jobs.JobStatus
+    status: _jobs.JobStatus
     created_at: datetime
     updated_at: datetime | None
     worker: str | None
@@ -81,7 +81,7 @@ async def create_job(
         VALUES (?, ?, ?)
         RETURNING id, created_at, updated_at, worker
         """,
-        (name, input_json, jobs.JobStatus.PENDING),
+        (name, input_json, _jobs.JobStatus.PENDING),
     ) as cursor:
         result = await cursor.fetchone()
 
@@ -90,7 +90,7 @@ async def create_job(
     return DBJob(
         name=name,
         input=input_json,
-        status=jobs.JobStatus.PENDING,
+        status=_jobs.JobStatus.PENDING,
         **result,
     )
 
@@ -137,7 +137,7 @@ async def get_next_job(conn: AsyncConnection, worker: str) -> DBJob | None:
         f"""
         SELECT id, name, input, status, created_at, updated_at, worker
         FROM jobs
-        WHERE status = '{jobs.JobStatus.PENDING.value}'
+        WHERE status = '{_jobs.JobStatus.PENDING.value}'
         ORDER BY created_at ASC
         LIMIT 1
         """
@@ -154,13 +154,13 @@ async def get_next_job(conn: AsyncConnection, worker: str) -> DBJob | None:
     await conn.execute(
         f"""
         UPDATE jobs
-        SET status = '{jobs.JobStatus.IN_PROGRESS.value}', updated_at = DATETIME('now'), worker = ?
+        SET status = '{_jobs.JobStatus.IN_PROGRESS.value}', updated_at = DATETIME('now'), worker = ?
         WHERE id = ?
         """,
         (worker, db_job.id),
     )
     await conn.commit()
-    db_job.status = jobs.JobStatus.IN_PROGRESS
+    db_job.status = _jobs.JobStatus.IN_PROGRESS
     db_job.worker = worker
 
     return db_job
@@ -169,7 +169,7 @@ async def get_next_job(conn: AsyncConnection, worker: str) -> DBJob | None:
 async def update_job_status(
     conn: AsyncConnection,
     job_id: int,
-    status: Literal[jobs.JobStatus.DONE, jobs.JobStatus.FAILED],
+    status: Literal[_jobs.JobStatus.DONE, _jobs.JobStatus.FAILED],
     output: bytes | None,
 ) -> None:
     await conn.execute(

@@ -1,6 +1,4 @@
-from browsy.jobs import BaseJob, Page, JobStatus
+from browsy._jobs import BaseJob, Page
 
 
-DEFAULT_DB_PATH = "browsy.db"
-
-__all__ = ["BaseJob", "Page", "JobStatus"]
+__all__ = ["BaseJob", "Page"]
