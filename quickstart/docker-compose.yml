@@ -28,7 +28,7 @@ services:
       - browsy_data:/data
     ipc: host
     security_opt:
-      - "seccomp=${PWD}/.seccomp_profile.json"
+      - "seccomp=${PWD}/seccomp_profile.json"
     environment:
       - BROWSY_DB_PATH=/data/browsy.db
       - BROWSY_JOBS_PATH=/worker/jobs
