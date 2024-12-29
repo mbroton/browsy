@@ -1,0 +1,27 @@
+services:
+  server:
+    image: ghcr.io/mbroton/browsy/server:v0.0.1
+    command: browsy server --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${JOBS_PATH:-./jobs}:/server/jobs
+      - browsy_data:/server/data
+    environment:
+      - BROWSY_DB_PATH=/server/data/browsy.db
+      - BROWSY_JOBS_PATH=/server/jobs
+    depends_on:
+      - worker
+
+  worker:
+    image: ghcr.io/mbroton/browsy/worker:v0.0.1
+    command: browsy worker
+    volumes:
+      - ${JOBS_PATH:-./jobs}:/worker/jobs
+      - browsy_data:/worker/data
+    environment:
+      - BROWSY_DB_PATH=/worker/data/browsy.db
+      - BROWSY_JOBS_PATH=/worker/jobs
+
+volumes:
+  browsy_data:
