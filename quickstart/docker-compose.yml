@@ -1,6 +1,6 @@
 services:
   server:
-    image: ghcr.io/mbroton/browsy/server:v0.0.1
+    image: ghcr.io/mbroton/browsy/server:v0.0.2
     command: browsy server --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
@@ -14,7 +14,7 @@ services:
       - worker
 
   worker:
-    image: ghcr.io/mbroton/browsy/worker:v0.0.1
+    image: ghcr.io/mbroton/browsy/worker:v0.0.2
     command: browsy worker
     volumes:
       - ${JOBS_PATH:-./jobs}:/worker/jobs
