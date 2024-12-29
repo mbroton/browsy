@@ -1,8 +1,38 @@
 [project]
 name = "browsy"
-version = "0.1.0"
-description = ""
+version = "0.0.1"
+description = "Playwright-based browser automation service with HTTP API and Docker support"
+authors = [
+    { name = "Michal Broton", email = "michal@broton.dev" }
+]
 readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Framework :: FastAPI",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10", 
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Testing",
+]
+keywords = [
+    "browser",
+    "automation",
+    "playwright",
+    "screenshot",
+    "pdf",
+    "scraping",
+    "queue",
+    "docker",
+]
 requires-python = ">=3.9"
 dependencies = [
     "click>=8.1.7",
