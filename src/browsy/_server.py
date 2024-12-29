@@ -60,6 +60,11 @@ class JobOutput(_database.DBOutput):
         return b64encode(value).decode()
 
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
 @app.post("/jobs", response_model=_database.DBJob)
 async def create_job(
     request: Request,
