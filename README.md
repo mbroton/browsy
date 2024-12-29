@@ -10,6 +10,7 @@
 The simplest way to spin browsy up is with Docker Compose. Check out the [documentation](https://broton.dev/) for all the details, but below is the quick and easy way to jump right in.
 
 Here's what you need to do:
+* Install browsy
 * Copy docker-compose.yml
 * Define jobs
 * Run docker compose
@@ -17,6 +18,12 @@ Here's what you need to do:
 
 
 ### Quick Start
+
+#### Install browsy
+
+```
+pip install browsy
+```
 
 #### Copy docker compose
 
