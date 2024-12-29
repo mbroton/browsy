@@ -16,12 +16,31 @@ Think of it as a way to turn your Playwright scripts into HTTP services that can
 
 ## Quick Start
 
-1. Install browsy:
+### Download files
+
+You can download required files using a script:
 ```bash
-pip install browsy
+curl -LsSf https://raw.githubusercontent.com/mbroton/browsy/main/scripts/get.sh | sh
 ```
 
-2. Define a job (e.g., `jobs/screenshot.py`):
+The files are: docker-compose file and example jobs.
+
+### Start browsy
+
+```bash
+docker compose up --build --scale worker=3
+```
+
+Optionally, you can define number of workers. **And that's it!**
+
+Visit `http://localhost:8000/docs` for interactive API documentation (provided by FastAPI).
+
+
+### Defining jobs
+
+A job is any class that inherits from `browsy.BaseJob`. **browsy** will look for `jobs/` folder and find those classes recursively.
+
+This is an example implementation:
 ```python
 from browsy import BaseJob, Page
 
@@ -54,12 +73,20 @@ class ScreenshotJob(BaseJob):
         return True
 ```
 
-3. Run browsy:
+Check what you can do with `page` in [Playwright's documentation](https://playwright.dev/python/docs/api/class-page).
+
+Check what you can do with Pydantic's parameters in [Pydantic's documentation](https://docs.pydantic.dev/latest/concepts/models/).
+
+
+### Client
+
+There's a browsy client to interact with the service. You can install it with:
 ```bash
-docker compose up --build
+pip install browsy
 ```
 
-4. Use it:
+and use it like this:
+
 ```python
 from browsy import BrowsyClient
 
