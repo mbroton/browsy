@@ -19,9 +19,18 @@ def cli():
     pass
 
 
+@cli.command()
+def version():
+    """Display the current version of browsy."""
+    from browsy import __version__
+
+    click.echo(__version__)
+
+
 @cli.command(context_settings={"ignore_unknown_options": True})
 @click.argument("uvicorn_args", nargs=-1, type=click.UNPROCESSED)
 def server(uvicorn_args: Tuple[str, ...]):
+    """Start the browsy server using uvicorn."""
     _validate_env_vars()
 
     import uvicorn
@@ -34,6 +43,7 @@ def server(uvicorn_args: Tuple[str, ...]):
     "--name", default=None, help="Worker name (random if not provided)"
 )
 def worker(name: Optional[str]):
+    """Start a browsy worker process."""
     _validate_env_vars()
 
     from browsy._worker import start_worker
