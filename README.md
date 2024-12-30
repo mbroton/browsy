@@ -96,6 +96,84 @@ with open("screenshot.png", "wb") as f:
 
 This example demonstrates how to submit a screenshot job, retrieve the result, and save it locally.
 
+### API
+
+You can explore and interact with the API using the Swagger UI documentation provided by FastAPI. Visit `http://localhost:8000/docs` to access it.
+
+If you prefer to interact with the service directly via HTTP, here are example requests:
+
+#### Submit a job
+
+`POST /api/v1/jobs`
+
+Example request:
+  ```json
+  {
+    "name": "screenshot",
+    "parameters": {
+      // Job's parameters (see job definition shown above)
+      "url": "https://example.com",
+      "full_page": true
+    }
+  }
+  ```
+
+Example response:
+```json
+{
+  "id": 1,
+  "name": "screenshot",
+  "input": {
+    "url": "https://example.com",
+    "html": null,
+    "full_page": true
+  },
+  "status": "pending",
+  "created_at": "2024-12-30T15:02:04.720000",
+  "updated_at": null,
+  "worker": null
+}
+```
+
+#### Check job status
+
+`GET /api/v1/jobs/{job_id}`
+
+Example response:
+```json
+{
+  "id": 1,
+  "name": "screenshot",
+  "input": {
+    "url": "https://example.com",
+    "html": null,
+    "full_page": true
+  },
+  "status": "done",
+  "created_at": "2024-12-30T15:06:39.204000",
+  "updated_at": "2024-12-30T15:06:44.743000",
+  "worker": "worker_lze4nFMy"
+}
+```
+
+#### Retrieve job result
+
+To retrieve the result of a job, use the following endpoint:
+
+`GET /api/v1/jobs/{job_id}/result`
+
+**Status Codes:**
+
+- **200**: The job is complete, and the output is available. The response type is `application/octet-stream`.
+- **202**: The job is pending or currently in progress.
+- **204**: The job is complete or has failed, and there is no output available.
+- **404**: No job exists with the provided ID.
+
+**Response Headers:**
+
+- `X-Job-Status`: Indicates the current status of the job.
+- `X-Job-Last-Updated`: Shows the last time the job's status was updated.
+
 ## How it works
 
 ![flow](.github/assets/flow.png)
