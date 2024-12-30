@@ -115,7 +115,7 @@ async def get_job_by_id(
 async def get_job_result_by_job_id(
     conn: AsyncConnection,
     job_id: int,
-) -> Optional[DBOutput]:
+) -> Optional[bytes]:
     async with conn.execute(
         """
         SELECT id, job_id, output
@@ -126,7 +126,7 @@ async def get_job_result_by_job_id(
     ) as cursor:
         result = await cursor.fetchone()
 
-    return DBOutput(**result) if result else None
+    return result["output"] if result else None
 
 
 async def get_next_job(conn: AsyncConnection, worker: str) -> Optional[DBJob]:
@@ -154,7 +154,7 @@ async def get_next_job(conn: AsyncConnection, worker: str) -> Optional[DBJob]:
     await conn.execute(
         f"""
         UPDATE jobs
-        SET status = '{_jobs.JobStatus.IN_PROGRESS.value}', updated_at = DATETIME('now'), worker = ?
+        SET status = '{_jobs.JobStatus.IN_PROGRESS.value}', updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now'), worker = ?
         WHERE id = ?
         """,
         (worker, db_job.id),
@@ -175,7 +175,7 @@ async def update_job_status(
     await conn.execute(
         """
         UPDATE jobs
-        SET status = ?, updated_at = DATETIME('now')
+        SET status = ?, updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now')
         WHERE id = ?
         """,
         (status, job_id),
