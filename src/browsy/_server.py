@@ -1,13 +1,36 @@
 import os
 from contextlib import asynccontextmanager
-from typing import Annotated, Optional
-from base64 import b64encode
+from typing import Annotated
 from pathlib import Path
 
-from fastapi import FastAPI, Depends, HTTPException, Request
-from pydantic import BaseModel, field_validator
+from fastapi import FastAPI, Depends, HTTPException, Request, Response
+from fastapi.openapi.utils import get_openapi
+from pydantic import BaseModel
 
 from browsy import _database, _jobs, __version__
+
+_JOBS_DEFS = _jobs.collect_jobs_defs(
+    os.environ.get("BROWSY_JOBS_PATH", str(Path().absolute()))
+)
+
+
+def custom_openapi():
+    """Custom OpenAPI to include jobs in schema that are dynamically loaded."""
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    for _, job_cls in _JOBS_DEFS.items():
+        openapi_schema["components"]["schemas"][
+            job_cls.__name__
+        ] = job_cls.model_json_schema()
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
 
 
 @asynccontextmanager
@@ -16,10 +39,7 @@ async def lifespan(app: FastAPI):
     if not db_path:
         raise ValueError("BROWSY_DB_PATH not set")
 
-    jobs_path = os.environ.get("BROWSY_JOBS_PATH", str(Path().absolute()))
-
     app.state.DB_PATH = db_path
-    app.state.JOBS_DEFS = _jobs.collect_jobs_defs(jobs_path)
 
     conn = await _database.create_connection(db_path)
 
@@ -47,6 +67,8 @@ app = FastAPI(
     ],
 )
 
+app.openapi = custom_openapi
+
 
 async def get_db(request: Request):
     conn = await _database.create_connection(request.app.state.DB_PATH)
@@ -59,19 +81,7 @@ async def get_db(request: Request):
 
 class JobRequest(BaseModel):
     name: str
-    input: dict
-
-
-class JobOutput(_database.DBOutput):
-    output: str
-
-    @field_validator("output", mode="before")
-    @classmethod
-    def b64encode_output(cls, value: Optional[bytes]) -> str:
-        if value is None:
-            return ""
-
-        return b64encode(value).decode()
+    parameters: dict
 
 
 @app.get("/health", include_in_schema=False)
@@ -81,15 +91,13 @@ async def healthcheck(_: Annotated[_database.AsyncConnection, Depends(get_db)]):
 
 @app.post("/api/v1/jobs", response_model=_database.DBJob, tags=["jobs"])
 async def submit_job(
-    request: Request,
     r: JobRequest,
     db_conn: Annotated[_database.AsyncConnection, Depends(get_db)],
 ):
-    jobs_defs: dict[str, type[_jobs.BaseJob]] = request.app.state.JOBS_DEFS
-    if r.name not in jobs_defs:
+    if r.name not in _JOBS_DEFS:
         raise HTTPException(400, "Job with that name is not defined.")
 
-    job = jobs_defs[r.name].model_validate(r.input)
+    job = _JOBS_DEFS[r.name].model_validate(r.parameters)
     is_valid = await job.validate_logic()
     if not is_valid:
         raise HTTPException(400, "Job validation failed")
@@ -108,25 +116,32 @@ async def get_job_by_id(
     return job
 
 
-@app.get(
-    "/api/v1/jobs/{job_id}/result", response_model=JobOutput, tags=["jobs"]
-)
+@app.get("/api/v1/jobs/{job_id}/result", tags=["jobs"])
 async def get_job_result_by_job_id(
     job_id: int, db_conn: Annotated[_database.AsyncConnection, Depends(get_db)]
 ):
     job = await _database.get_job_by_id(db_conn, job_id)
     if not job:
-        raise HTTPException(404, "Job not found")
+        raise HTTPException(404)
 
-    if job.status == _jobs.JobStatus.PENDING:
-        raise HTTPException(404, "Job is pending")
-    if job.status == _jobs.JobStatus.IN_PROGRESS:
-        raise HTTPException(404, "Job is in progress")
+    headers = {
+        "X-Job-Status": job.status,
+        "X-Job-Last-Updated": job.updated_at.isoformat(),
+    }
+
+    if job.status in (_jobs.JobStatus.IN_PROGRESS, _jobs.JobStatus.PENDING):
+        return Response(202, headers=headers)
+
     if job.status == _jobs.JobStatus.FAILED:
-        raise HTTPException(500, "Job failed")
+        return Response(204, headers=headers)
 
     job_result = await _database.get_job_result_by_job_id(db_conn, job_id)
     if job_result is None:
-        raise HTTPException(500, "Job finished, but there's no result")
+        return Response(204, headers=headers)
 
-    return job_result
+    return Response(
+        content=job_result,
+        status_code=200,
+        media_type="application/octet-stream",
+        headers=headers,
+    )
