@@ -4,6 +4,8 @@ from browsy import BaseJob, Page
 
 
 class PDFJob(BaseJob):
+    """Generates a PDF from a webpage or HTML content."""
+
     NAME = "pdf"
 
     url: Optional[str] = None

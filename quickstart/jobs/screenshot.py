@@ -4,6 +4,8 @@ from browsy import BaseJob, Page
 
 
 class ScreenshotJob(BaseJob):
+    """Generates a screenshot from a webpage or HTML content."""
+
     NAME = "screenshot"
 
     url: Optional[str] = None
