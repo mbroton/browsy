@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
-from browsy import _database, _jobs
+from browsy import _database, _jobs, __version__
 
 
 @asynccontextmanager
@@ -31,7 +31,21 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    title="browsy",
+    version=__version__,
+    redoc_url=None,
+    openapi_tags=[
+        {
+            "name": "jobs",
+            "description": (
+                "Create, monitor, and retrieve results from browser"
+                " automation jobs."
+            ),
+        }
+    ],
+)
 
 
 async def get_db(request: Request):
@@ -60,13 +74,13 @@ class JobOutput(_database.DBOutput):
         return b64encode(value).decode()
 
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+@app.get("/health", include_in_schema=False)
+async def healthcheck(_: Annotated[_database.AsyncConnection, Depends(get_db)]):
+    return {"status": "ok", "version": __version__}
 
 
-@app.post("/jobs", response_model=_database.DBJob)
-async def create_job(
+@app.post("/api/v1/jobs", response_model=_database.DBJob, tags=["jobs"])
+async def submit_job(
     request: Request,
     r: JobRequest,
     db_conn: Annotated[_database.AsyncConnection, Depends(get_db)],
@@ -83,7 +97,7 @@ async def create_job(
     return await _database.create_job(db_conn, r.name, job.model_dump_json())
 
 
-@app.get("/jobs/{job_id}", response_model=_database.DBJob)
+@app.get("/api/v1/jobs/{job_id}", response_model=_database.DBJob, tags=["jobs"])
 async def get_job_by_id(
     job_id: int, db_conn: Annotated[_database.AsyncConnection, Depends(get_db)]
 ):
@@ -94,7 +108,9 @@ async def get_job_by_id(
     return job
 
 
-@app.get("/jobs/{job_id}/result", response_model=JobOutput)
+@app.get(
+    "/api/v1/jobs/{job_id}/result", response_model=JobOutput, tags=["jobs"]
+)
 async def get_job_result_by_job_id(
     job_id: int, db_conn: Annotated[_database.AsyncConnection, Depends(get_db)]
 ):
