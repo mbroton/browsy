@@ -25,6 +25,7 @@ curl -LsSf https://raw.githubusercontent.com/mbroton/browsy/main/scripts/get.sh 
 
 This script will download the `docker-compose` file and example jobs. Once downloaded, navigate to the `browsy/` directory.
 
+Alternatively, you can clone the repository directly and navigate to the quickstart directory.
 
 ### Start browsy
 
@@ -38,8 +39,6 @@ You can adjust the number of workers by modifying the `--scale worker` parameter
 Visit `http://localhost:8000/docs` to access the interactive API documentation provided by FastAPI.
 
 ### Defining custom jobs
-
-A job is any class that inherits from `browsy.BaseJob`.
 
 A job is defined as any class that inherits from `browsy.BaseJob`. Browsy will automatically search for these classes within the `jobs/` directory.
 
