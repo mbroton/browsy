@@ -18,47 +18,43 @@ Think of it as a way to turn your Playwright scripts into HTTP services that can
 
 ### Download files
 
-You can download required files using a script:
+To get started, download the necessary files using the following script:
 ```bash
 curl -LsSf https://raw.githubusercontent.com/mbroton/browsy/main/scripts/get.sh | sh
 ```
 
-The files are: docker-compose file and example jobs.
+This script will download the `docker-compose` file and example jobs. Once downloaded, navigate to the `browsy/` directory.
+
 
 ### Start browsy
 
+To start the service, run:
 ```bash
 docker compose up --build --scale worker=3
 ```
 
-Optionally, you can define number of workers. **And that's it!**
+You can adjust the number of workers by modifying the `--scale worker` parameter. 
 
-Visit `http://localhost:8000/docs` for interactive API documentation (provided by FastAPI).
+Visit `http://localhost:8000/docs` to access the interactive API documentation provided by FastAPI.
 
+### Defining custom jobs
 
-### Defining jobs
+A job is any class that inherits from `browsy.BaseJob`.
 
-A job is any class that inherits from `browsy.BaseJob`. **browsy** will look for `jobs/` folder and find those classes recursively.
+A job is defined as any class that inherits from `browsy.BaseJob`. Browsy will automatically search for these classes within the `jobs/` directory.
 
-This is an example implementation:
+Here's an example implementation:
 ```python
 from browsy import BaseJob, Page
 
-# Define a job by inheriting from BaseJob (which works like Pydantic's BaseModel)
-# and giving it a unique name
 class ScreenshotJob(BaseJob):
-    # This name will be used to identify the job type when making API calls
     NAME = "screenshot"
 
-    # Define job parameters
-    # All of these will be automatically parsed from the JSON request
-    url: str | None = None      # URL to take screenshot of
-    html: str | None = None     # Or raw HTML to render
-    full_page: bool = False     # Whether to capture the full scrollable page
+    url: str | None = None
+    html: str | None = None
+    full_page: bool = False
 
     async def execute(self, page: Page) -> bytes:
-        # This is where the actual browser automation happens
-        # `page` is a Playwright `Page` object with all its methods available
         if self.url:
             await page.goto(self.url)
         elif self.html:
@@ -66,37 +62,40 @@ class ScreenshotJob(BaseJob):
         return await page.screenshot(full_page=self.full_page)
 
     async def validate_logic(self) -> bool:
-        # Optional validation method that runs when submitting a new job
-        # Here we check that exactly one of url/html is provided
-        if bool(self.url) == bool(self.html):
-            return False
-        return True
+        return bool(self.url) != bool(self.html)
 ```
 
-Check what you can do with `page` in [Playwright's documentation](https://playwright.dev/python/docs/api/class-page).
+- **Class Definition**: The `ScreenshotJob` class inherits from `BaseJob`, which itself is based on Pydantic's `BaseModel`. This provides automatic data validation and serialization.
+- **Job Name**: The `NAME` attribute uniquely identifies the job type when making API calls.
+- **Parameters**: Defined as class attributes, these are automatically validated by Pydantic during API calls. This ensures that input data meets the expected types and constraints before processing.
+- **Validation Logic**: The `validate_logic` method runs during API calls to verify that the job's input parameters satisfy specific conditions. This validation occurs before the job is submitted for execution, allowing for early detection of configuration errors.
+- **Execution Method**: The `execute` method carries out the browser automation using a Playwright `Page` object. Workers use this method to execute jobs.
 
-Check what you can do with Pydantic's parameters in [Pydantic's documentation](https://docs.pydantic.dev/latest/concepts/models/).
-
+Refer to [Playwright's documentation](https://playwright.dev/python/docs/api/class-page) for more details on what you can do with `page`.
 
 ### Client
 
-There's a browsy client to interact with the service. You can install it with:
+To interact with the service using Python, you can use browsy client:
 ```bash
 pip install browsy
 ```
 
-and use it like this:
-
+Here's how you can use it:
 ```python
 from browsy import BrowsyClient
 
 client = BrowsyClient("http://127.0.0.1")
-job_id = client.add_job("screenshot", {
+job_id = client.submit_job("screenshot", {
     "url": "https://example.com",
     "full_page": True
 })
-screenshot = client.get_result(job_id=job_id).content
+screenshot = client.get_result(job_id=job_id)
+
+with open("screenshot.png", "wb") as f:
+    f.write(screenshot)
 ```
+
+This example demonstrates how to submit a screenshot job, retrieve the result, and save it locally.
 
 ## How it works
 
