@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional, Union
 
 from browsy import BaseJob, Page
 
@@ -6,9 +6,9 @@ from browsy import BaseJob, Page
 class PDFJob(BaseJob):
     NAME = "pdf"
 
-    url: str | None = None
-    html: str | None = None
-    emulate_media: Literal["null", "print", "screen"] | None = None
+    url: Optional[str] = None
+    html: Optional[str] = None
+    emulate_media: Union[Literal["null", "print", "screen"], None] = None
 
     async def execute(self, page: Page) -> bytes:
         if self.url:
@@ -20,3 +20,6 @@ class PDFJob(BaseJob):
             await page.emulate_media(self.emulate_media)
 
         return await page.pdf()
+
+    async def validate_logic(self) -> bool:
+        return bool(self.url) != bool(self.html)
