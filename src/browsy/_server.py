@@ -1,6 +1,6 @@
 import os
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, Optional
 from base64 import b64encode
 from pathlib import Path
 
@@ -53,7 +53,7 @@ class JobOutput(_database.DBOutput):
 
     @field_validator("output", mode="before")
     @classmethod
-    def b64encode_output(cls, value: bytes | None) -> str:
+    def b64encode_output(cls, value: Optional[bytes]) -> str:
         if value is None:
             return ""
 

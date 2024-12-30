@@ -3,6 +3,7 @@ import logging
 import time
 import os
 from pathlib import Path
+from typing import Optional
 
 from playwright.async_api import (
     async_playwright,
@@ -34,8 +35,8 @@ async def worker_loop(
     log.info("Ready to work")
     shutdown = False
     last_heartbeat = time.monotonic()
-    browser: Browser | None = None
-    current_job_task: asyncio.Task | None = None
+    browser: Optional[Browser] = None
+    current_job_task: Optional[asyncio.Task] = None
 
     try:
         browser = await pw_ctx.chromium.launch(headless=True)
@@ -100,7 +101,7 @@ async def worker_loop(
 
 
 async def _cancel_task(
-    task: asyncio.Task | None, log: logging.Logger | None = None
+    task: Optional[asyncio.Task], log: Optional[logging.Logger] = None
 ) -> None:
     log = log or logger
     if task and not task.done():
@@ -112,7 +113,7 @@ async def _cancel_task(
 
 
 async def _shutdown_browser(
-    browser: Browser, timeout: float = 5.0, log: logging.Logger | None = None
+    browser: Browser, timeout: float = 5.0, log: Optional[logging.Logger] = None
 ) -> None:
     log = log or logger
     try:
@@ -122,7 +123,7 @@ async def _shutdown_browser(
 
 
 async def start_worker(
-    name: str, db_path: str, jobs_path: str | None = None
+    name: str, db_path: str, jobs_path: Optional[str] = None
 ) -> None:
     if not os.path.exists(db_path):
         raise FileNotFoundError(db_path)

@@ -1,13 +1,13 @@
 import json
 from datetime import datetime
-from typing import TypeAlias, Literal
+from typing import Literal, Optional, Union
 
 import aiosqlite
 from pydantic import BaseModel, field_validator
 
 from browsy import _jobs
 
-AsyncConnection: TypeAlias = aiosqlite.Connection
+AsyncConnection = aiosqlite.Connection
 
 _INIT_SQL = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -39,12 +39,12 @@ class DBJob(BaseModel):
     input: dict
     status: _jobs.JobStatus
     created_at: datetime
-    updated_at: datetime | None
-    worker: str | None
+    updated_at: Optional[datetime]
+    worker: Optional[str]
 
     @field_validator("input", mode="before")
     @classmethod
-    def json_str_output(cls, v: str | dict) -> dict:
+    def json_str_output(cls, v: Union[str, dict]) -> dict:
         if isinstance(v, str):
             return json.loads(v)
         return v
@@ -53,7 +53,7 @@ class DBJob(BaseModel):
 class DBOutput(BaseModel):
     id: int
     job_id: int
-    output: bytes | None
+    output: Optional[bytes]
 
 
 async def create_connection(db_path: str) -> AsyncConnection:
@@ -98,7 +98,7 @@ async def create_job(
 async def get_job_by_id(
     conn: AsyncConnection,
     id_: int,
-) -> DBJob | None:
+) -> Optional[DBJob]:
     async with conn.execute(
         """
         SELECT id, name, input, status, created_at, updated_at, worker
@@ -115,7 +115,7 @@ async def get_job_by_id(
 async def get_job_result_by_job_id(
     conn: AsyncConnection,
     job_id: int,
-) -> DBOutput | None:
+) -> Optional[DBOutput]:
     async with conn.execute(
         """
         SELECT id, job_id, output
@@ -129,7 +129,7 @@ async def get_job_result_by_job_id(
     return DBOutput(**result) if result else None
 
 
-async def get_next_job(conn: AsyncConnection, worker: str) -> DBJob | None:
+async def get_next_job(conn: AsyncConnection, worker: str) -> Optional[DBJob]:
     # Acquires a reserved lock, blocking other write transactions
     await conn.execute("BEGIN IMMEDIATE")
 
@@ -170,7 +170,7 @@ async def update_job_status(
     conn: AsyncConnection,
     job_id: int,
     status: Literal[_jobs.JobStatus.DONE, _jobs.JobStatus.FAILED],
-    output: bytes | None,
+    output: Optional[bytes],
 ) -> None:
     await conn.execute(
         """

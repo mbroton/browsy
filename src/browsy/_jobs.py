@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import ClassVar
+from typing import ClassVar, Union
 from pathlib import Path
 
 from playwright.async_api import Page
@@ -17,7 +17,7 @@ class JobStatus(str, Enum):
     FAILED = "failed"
 
 
-def collect_jobs_defs(path: str | Path) -> dict:
+def collect_jobs_defs(path: Union[str, Path]) -> dict:
     """Collect job class definitions from Python files in the specified path.
 
     Args:

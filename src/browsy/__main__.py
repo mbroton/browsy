@@ -3,6 +3,7 @@ import logging
 import os
 import string
 import random
+from typing import Tuple, Optional
 
 import click
 
@@ -20,7 +21,7 @@ def cli():
 
 @cli.command(context_settings={"ignore_unknown_options": True})
 @click.argument("uvicorn_args", nargs=-1, type=click.UNPROCESSED)
-def server(uvicorn_args: tuple[str]):
+def server(uvicorn_args: Tuple[str, ...]):
     _validate_env_vars()
 
     import uvicorn
@@ -32,7 +33,7 @@ def server(uvicorn_args: tuple[str]):
 @click.option(
     "--name", default=None, help="Worker name (random if not provided)"
 )
-def worker(name: str | None):
+def worker(name: Optional[str]):
     _validate_env_vars()
 
     from browsy._worker import start_worker
