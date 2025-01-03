@@ -1,6 +1,6 @@
 [project]
 name = "browsy"
-version = "0.0.3"
+version = "0.0.4"
 description = "Playwright-based browser automation service with HTTP API and Docker support"
 authors = [
     { name = "Michal Broton", email = "michal@broton.dev" }
