@@ -21,6 +21,14 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 
+CREATE TABLE IF NOT EXISTS workers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    last_check_in_time DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now')),
+    last_activity_time DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_workers_name ON workers(name);
+
 CREATE TABLE IF NOT EXISTS outputs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id INTEGER NOT NULL,
@@ -159,6 +167,9 @@ async def get_next_job(conn: AsyncConnection, worker: str) -> Optional[DBJob]:
         """,
         (worker, db_job.id),
     )
+
+    await update_worker_activity(conn, worker, commit=False)
+
     await conn.commit()
     db_job.status = _jobs.JobStatus.IN_PROGRESS
     db_job.worker = worker
@@ -168,6 +179,7 @@ async def get_next_job(conn: AsyncConnection, worker: str) -> Optional[DBJob]:
 
 async def update_job_status(
     conn: AsyncConnection,
+    worker: str,
     job_id: int,
     status: Literal[_jobs.JobStatus.DONE, _jobs.JobStatus.FAILED],
     output: Optional[bytes],
@@ -190,4 +202,39 @@ async def update_job_status(
             (job_id, output),
         )
 
+    await update_worker_activity(conn, worker, commit=False)
+
     await conn.commit()
+
+
+async def check_in_worker(
+    conn: AsyncConnection,
+    worker: str,
+) -> None:
+    """Updates worker's last check-in timestamp."""
+    await conn.execute(
+        """
+        INSERT INTO workers (name, last_check_in_time)
+        VALUES (?, strftime('%Y-%m-%d %H:%M:%f', 'now'))
+        ON CONFLICT(name) DO UPDATE SET
+            last_check_in_time = strftime('%Y-%m-%d %H:%M:%f', 'now')
+        """,
+        (worker,),
+    )
+    await conn.commit()
+
+
+async def update_worker_activity(
+    conn: AsyncConnection, worker: str, commit: bool = True
+) -> None:
+    """Updates worker's last activity timestamp."""
+    await conn.execute(
+        """
+        UPDATE workers
+        SET last_activity_time = strftime('%Y-%m-%d %H:%M:%f', 'now')
+        WHERE name = ?
+        """,
+        (worker,),
+    )
+    if commit:
+        await conn.commit()
