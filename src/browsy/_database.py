@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from typing import Literal, Optional, Union
+from typing import Literal, Optional, Union, List, Tuple
 
 import aiosqlite
 from pydantic import BaseModel, field_validator
@@ -39,16 +39,17 @@ CREATE INDEX IF NOT EXISTS idx_outputs_job_id ON outputs(job_id);
 """
 
 
-class DBJob(BaseModel):
-    """Represents a job record from the database."""
-
+class DBJobBase(BaseModel):
     id: int
     name: str
-    input: dict
     status: _jobs.JobStatus
     created_at: datetime
     updated_at: Optional[datetime]
     worker: Optional[str]
+
+
+class DBJob(DBJobBase):
+    input: dict
 
     @field_validator("input", mode="before")
     @classmethod
@@ -62,6 +63,17 @@ class DBOutput(BaseModel):
     id: int
     job_id: int
     output: Optional[bytes]
+
+
+class DBWorker(BaseModel):
+    id: int
+    name: str
+    last_check_in_time: datetime
+    last_activity_time: datetime
+
+    @property
+    def uptime(self) -> datetime:
+        return datetime.now()
 
 
 async def create_connection(db_path: str) -> AsyncConnection:
@@ -238,3 +250,59 @@ async def update_worker_activity(
     )
     if commit:
         await conn.commit()
+
+
+async def get_workers(
+    conn: AsyncConnection, ge: Optional[datetime] = None
+) -> List[DBWorker]:
+    args = []
+    query = """SELECT id, name, last_check_in_time, last_activity_time
+                    FROM workers"""
+    if ge:
+        query += " WHERE last_check_in_time >= ?"
+        args.append(ge)
+
+    query += " ORDER BY last_activity_time DESC"
+
+    async with conn.execute(query, args) as cursor:
+        result = await cursor.fetchall()
+
+    if not result:
+        return []
+
+    return [DBWorker(**r) for r in result]
+
+
+async def get_jobs(
+    conn: AsyncConnection,
+    status: Optional[_jobs.JobStatus] = None,
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+) -> Tuple[List[DBJob], int]:
+    limit = limit or 50
+    offset = offset or 0
+
+    args = []
+    where_clause = ""
+    if status:
+        where_clause = " WHERE status = ? "
+        args.append(status)
+
+    count_query = f"SELECT COUNT(*) FROM jobs{where_clause}"
+    async with conn.execute(count_query, args) as cursor:
+        total_count = (await cursor.fetchone())[0]
+
+    query = f"""
+        SELECT id, name, status, created_at, updated_at, worker 
+        FROM jobs{where_clause}
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+    """
+    args.extend([limit, offset])
+
+    async with conn.execute(query, args) as cursor:
+        rows = await cursor.fetchall()
+
+    jobs = [DBJobBase(**r) for r in rows]
+
+    return jobs, total_count
