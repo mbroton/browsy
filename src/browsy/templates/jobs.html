@@ -55,7 +55,7 @@
                 -
                 {% endif %}
             </td>
-            <td>{{ job.processing_time if job.processing_time else '-' }}</td>
+            <td data-format="milliseconds">{{ job.processing_time if job.processing_time else '-' }}</td>
             <td>{{ job.worker if job.worker else '-' }}</td>
             <td>
                 {% if job.status == 'done' %}
@@ -85,6 +85,17 @@
 function changePage(offset, limit) {
     window.location.href = `?offset=${offset}&limit=${limit}`;
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('[data-format="milliseconds"]').forEach(cell => {
+        const content = cell.textContent.trim();
+        if (content !== '-' && !isNaN(content)) {
+            const ms = parseInt(content);
+            const seconds = (ms / 1000).toFixed(3);
+            cell.textContent = seconds + 's';
+        }
+    });
+});
 </script>
 
 {% endblock %}

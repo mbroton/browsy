@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     status TEXT NOT NULL,
     created_at DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now')),
     updated_at DATETIME,
-    worker TEXT
+    worker TEXT,
+    processing_time INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 
@@ -46,6 +47,7 @@ class DBJobBase(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime]
     worker: Optional[str]
+    processing_time: Optional[int]  # milliseconds
 
 
 class DBJob(DBJobBase):
@@ -99,7 +101,7 @@ async def create_job(
         """
         INSERT INTO jobs (name, input, status)
         VALUES (?, ?, ?)
-        RETURNING id, created_at, updated_at, worker
+        RETURNING id, created_at, updated_at, worker, processing_time
         """,
         (name, input_json, _jobs.JobStatus.PENDING),
     ) as cursor:
@@ -121,7 +123,7 @@ async def get_job_by_id(
 ) -> Optional[DBJob]:
     async with conn.execute(
         """
-        SELECT id, name, input, status, created_at, updated_at, worker
+        SELECT id, name, input, status, created_at, updated_at, worker, processing_time
         FROM jobs
         WHERE id = ?
         """,
@@ -155,7 +157,7 @@ async def get_next_job(conn: AsyncConnection, worker: str) -> Optional[DBJob]:
 
     async with conn.execute(
         f"""
-        SELECT id, name, input, status, created_at, updated_at, worker
+        SELECT id, name, input, status, created_at, updated_at, worker, processing_time
         FROM jobs
         WHERE status = '{_jobs.JobStatus.PENDING.value}'
         ORDER BY created_at ASC
@@ -194,15 +196,16 @@ async def update_job_status(
     worker: str,
     job_id: int,
     status: Literal[_jobs.JobStatus.DONE, _jobs.JobStatus.FAILED],
+    processing_time: int,
     output: Optional[bytes],
 ) -> None:
     await conn.execute(
         """
         UPDATE jobs
-        SET status = ?, updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now')
+        SET status = ?, updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now'), processing_time = ?
         WHERE id = ?
         """,
-        (status, job_id),
+        (status, processing_time, job_id),
     )
 
     if output:
@@ -293,7 +296,7 @@ async def get_jobs(
         total_count = (await cursor.fetchone())[0]
 
     query = f"""
-        SELECT id, name, status, created_at, updated_at, worker 
+        SELECT id, name, status, created_at, updated_at, worker, processing_time
         FROM jobs{where_clause}
         ORDER BY created_at DESC
         LIMIT ? OFFSET ?

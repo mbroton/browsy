@@ -58,6 +58,7 @@ async def worker_loop(
 
                 last_heartbeat = timeref
                 log.info(f"Starting job {job.id} ({job.name!r})")
+                processing_time_start = time.monotonic()
 
                 try:
                     async with await browser.new_context() as ctx:
@@ -71,6 +72,10 @@ async def worker_loop(
                     asyncio.CancelledError,
                     playwright.async_api.Error,
                 ) as e:
+                    processing_time = _calculate_processing_time(
+                        processing_time_start
+                    )
+
                     if isinstance(e, asyncio.CancelledError):
                         log.exception(
                             f"Job interrupted, marking {job.id} as failed"
@@ -84,7 +89,7 @@ async def worker_loop(
                     await _cancel_task(current_job_task)
                     job.status = _jobs.JobStatus.FAILED
                     await _database.update_job_status(
-                        db, name, job.id, job.status, None
+                        db, name, job.id, job.status, processing_time, None
                     )
                     shutdown = True
                     break
@@ -97,9 +102,12 @@ async def worker_loop(
                     log.info(f"Job {job.id} is done")
                     job.status = _jobs.JobStatus.DONE
 
+                processing_time = _calculate_processing_time(
+                    processing_time_start
+                )
                 output = output if job.status == _jobs.JobStatus.DONE else None
                 await _database.update_job_status(
-                    db, name, job.id, job.status, output
+                    db, name, job.id, job.status, processing_time, output
                 )
 
             except asyncio.CancelledError:
@@ -134,6 +142,10 @@ async def _shutdown_browser(
         await asyncio.wait_for(browser.close(), timeout=timeout)
     except (asyncio.TimeoutError, playwright.async_api.Error) as e:
         log.warning(f"Failed to close browser gracefully: {e!r}")
+
+
+def _calculate_processing_time(start_time: float) -> int:
+    return round((time.monotonic() - start_time) * 1000)
 
 
 async def start_worker(
