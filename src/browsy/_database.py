@@ -253,14 +253,14 @@ async def update_worker_activity(
 
 
 async def get_workers(
-    conn: AsyncConnection, ge: Optional[datetime] = None
+    conn: AsyncConnection, last_activity_time_ge: Optional[datetime] = None
 ) -> List[DBWorker]:
     args = []
     query = """SELECT id, name, last_check_in_time, last_activity_time
                     FROM workers"""
-    if ge:
-        query += " WHERE last_check_in_time >= ?"
-        args.append(ge)
+    if last_activity_time_ge:
+        query += " WHERE last_activity_time >= ?"
+        args.append(last_activity_time_ge)
 
     query += " ORDER BY last_activity_time DESC"
 
