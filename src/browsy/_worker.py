@@ -31,6 +31,7 @@ async def worker_loop(
     name: str,
     jobs_defs: dict[str, type[_jobs.BaseJob]],
 ) -> None:
+    await _database.check_in_worker(db, name)
     log = logging.getLogger(name)
     log.info("Ready to work")
     shutdown = False
@@ -49,6 +50,7 @@ async def worker_loop(
                 if not job:
                     if timeref - last_heartbeat >= _HEARTBEAT_LOG_INTERVAL:
                         log.info("Worker is alive and polling for jobs")
+                        await _database.update_worker_activity(db, name)
                         last_heartbeat = timeref
 
                     await asyncio.sleep(_JOB_POLL_INTERVAL)
@@ -65,12 +67,24 @@ async def worker_loop(
                             )
                             output = await current_job_task
 
-                except (asyncio.CancelledError, playwright.async_api.Error):
-                    log.error(f"Job interrupted, marking {job.id} as failed")
+                except (
+                    asyncio.CancelledError,
+                    playwright.async_api.Error,
+                ) as e:
+                    if isinstance(e, asyncio.CancelledError):
+                        log.exception(
+                            f"Job interrupted, marking {job.id} as failed"
+                        )
+                    else:
+                        log.exception(
+                            f"Browser error occurred for job {job.id}"
+                            " (marking as failed)"
+                        )
+
                     await _cancel_task(current_job_task)
                     job.status = _jobs.JobStatus.FAILED
                     await _database.update_job_status(
-                        db, job.id, job.status, None
+                        db, name, job.id, job.status, None
                     )
                     shutdown = True
                     break
@@ -85,7 +99,7 @@ async def worker_loop(
 
                 output = output if job.status == _jobs.JobStatus.DONE else None
                 await _database.update_job_status(
-                    db, job.id, job.status, output
+                    db, name, job.id, job.status, output
                 )
 
             except asyncio.CancelledError:
