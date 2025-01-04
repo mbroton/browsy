@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Jobs Status{% endblock %}
+
+{% block page_title %}Jobs Status{% endblock %}
+
+{% block content %}
+<div style="color: #666; font-size: 0.9em; margin-bottom: 20px;">Total jobs: {{ pagination.count }}</div>
+
+{% if jobs %}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Last Updated</th>
+            <th>Total Time</th>
+            <th>Processing Time</th>
+            <th>Worker</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for job in jobs %}
+        <tr {% if job.status == 'done' %}style="background-color: rgba(0, 255, 0, 0.05)"
+            {% elif job.status == 'failed' %}style="background-color: rgba(255, 0, 0, 0.05)" 
+            {% elif job.status == 'in_progress' %}style="background-color: rgba(0, 0, 255, 0.05)"
+            {% endif %}>
+            <td>{{ job.id }}</td>
+            <td>{{ job.name }}</td>
+            <td>{{ job.status }}</td>
+            <td>
+                <span class="timestamp" data-time="{{ job.created_at.isoformat() }}">
+                    {{ job.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                </span>
+            </td>
+            <td>
+                {% if job.updated_at %}
+                <span class="timestamp" data-time="{{ job.updated_at.isoformat() }}">
+                    {{ job.updated_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                </span>
+                {% else %}
+                -
+                {% endif %}
+            </td>
+            <td>
+                {% if (job.status == 'done' or job.status == 'failed') and job.updated_at %}
+                <span class="duration" 
+                      data-start="{{ job.created_at.isoformat() }}" 
+                      data-end="{{ job.updated_at.isoformat() }}">
+                </span>
+                {% else %}
+                -
+                {% endif %}
+            </td>
+            <td>{{ job.processing_time if job.processing_time else '-' }}</td>
+            <td>{{ job.worker if job.worker else '-' }}</td>
+            <td>
+                {% if job.status == 'done' %}
+                <a href="/api/v1/jobs/{{ job.id }}/result">⬇️</a>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No jobs found.</p>
+{% endif %}
+
+<div class="pagination" style="text-align: right; margin-top: 20px;">
+    {% set current_offset = pagination.offset if pagination.offset is not none else 0 %}
+    {% set limit = pagination.limit if pagination.limit is not none else 50 %}
+    {% if current_offset > 0 %}
+    <button onclick="changePage({{ current_offset - limit }}, {{ limit }})" class="refresh-button">Previous</button>
+    {% endif %}
+    {% if jobs|length == limit %}
+    <button onclick="changePage({{ current_offset + limit }}, {{ limit }})" class="refresh-button">Next</button>
+    {% endif %}
+</div>
+
+<script>
+function changePage(offset, limit) {
+    window.location.href = `?offset=${offset}&limit=${limit}`;
+}
+</script>
+
+{% endblock %}

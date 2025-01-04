@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Workers Status{% endblock %}
+
+{% block page_title %}Workers Status{% endblock %}
+
+{% block content %}
+<div style="color: #666; font-size: 0.9em; margin-bottom: 20px;">Active workers: {{ workers|length }}</div>
+
+{% if workers %}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Last Check-in</th>
+            <th>Last Activity</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for worker in workers %}
+        <tr>
+            <td>{{ worker.id }}</td>
+            <td>{{ worker.name }}</td>
+            <td>
+                <span class="timestamp" data-time="{{ worker.last_check_in_time.isoformat() }}">
+                    {{ worker.last_check_in_time.strftime('%Y-%m-%d %H:%M:%S') }}
+                </span>
+                <span class="elapsed"></span>
+            </td>
+            <td>
+                <span class="timestamp" data-time="{{ worker.last_activity_time.isoformat() }}">
+                    {{ worker.last_activity_time.strftime('%Y-%m-%d %H:%M:%S') }}
+                </span>
+                <span class="elapsed"></span>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No workers are currently active.</p>
+{% endif %}
+{% endblock %}

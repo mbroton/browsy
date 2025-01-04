@@ -1,9 +1,12 @@
 import os
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, Optional
 from pathlib import Path
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, Depends, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
 from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
 
@@ -40,6 +43,7 @@ async def lifespan(app: FastAPI):
         raise ValueError("BROWSY_DB_PATH not set")
 
     app.state.DB_PATH = db_path
+    app.state.startup_time = datetime.now(timezone.utc)
 
     conn = await _database.create_connection(db_path)
 
@@ -66,8 +70,9 @@ app = FastAPI(
         }
     ],
 )
-
 app.openapi = custom_openapi
+
+templates = Jinja2Templates(directory="src/browsy/templates")
 
 
 async def get_db(request: Request):
@@ -82,11 +87,6 @@ async def get_db(request: Request):
 class JobRequest(BaseModel):
     name: str
     parameters: dict
-
-
-@app.get("/health", include_in_schema=False)
-async def healthcheck(_: Annotated[_database.AsyncConnection, Depends(get_db)]):
-    return {"status": "ok", "version": __version__}
 
 
 @app.post("/api/v1/jobs", response_model=_database.DBJob, tags=["jobs"])
@@ -144,4 +144,47 @@ async def get_job_result_by_job_id(
         status_code=200,
         media_type="application/octet-stream",
         headers=headers,
+    )
+
+
+@app.get("/health", include_in_schema=False)
+async def healthcheck(_: Annotated[_database.AsyncConnection, Depends(get_db)]):
+    return {"status": "ok", "version": __version__}
+
+
+@app.get("/internal", include_in_schema=False)
+async def get_monitoring():
+    return RedirectResponse(url="/internal/workers")
+
+
+@app.get("/internal/workers", include_in_schema=False)
+async def get_workers_information(
+    request: Request,
+    db_conn: Annotated[_database.AsyncConnection, Depends(get_db)],
+):
+    workers = await _database.get_workers(
+        db_conn, last_activity_time_ge=app.state.startup_time
+    )
+    return templates.TemplateResponse(
+        request=request, name="workers.html", context={"workers": workers}
+    )
+
+
+@app.get("/internal/jobs", include_in_schema=False)
+async def get_jobs_information(
+    request: Request,
+    db_conn: Annotated[_database.AsyncConnection, Depends(get_db)],
+    limit: Optional[int] = None,
+    offset: Optional[int] = None,
+):
+    jobs, count = await _database.get_jobs(db_conn, limit=limit, offset=offset)
+    for j in jobs:
+        j.status = j.status.value
+    return templates.TemplateResponse(
+        request=request,
+        name="jobs.html",
+        context={
+            "jobs": jobs,
+            "pagination": {"limit": limit, "offset": offset, "count": count},
+        },
     )
