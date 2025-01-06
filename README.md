@@ -174,6 +174,20 @@ To retrieve the result of a job, use the following endpoint:
 - `X-Job-Status`: Indicates the current status of the job.
 - `X-Job-Last-Updated`: Shows the last time the job's status was updated.
 
+### Internal Dashboard
+
+Browsy provides a built-in monitoring dashboard accessible at `/internal`. This interface gives you real-time visibility:
+
+- View all active workers and their current status
+- Monitor job queues and execution status
+- Track execution times
+- Identify potential bottlenecks or issues
+
+The dashboard updates automatically to show you the latest state of your system:
+
+![Internal Dashboard](.github/assets/dashboard.png)
+
+
 ## How it works
 
 ![flow](.github/assets/flow.png)
