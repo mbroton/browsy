@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION=v0.0.4
+VERSION=v0.0.5
 BASE_URL="https://raw.githubusercontent.com/mbroton/browsy/$VERSION/quickstart"
 FILES=("docker-compose.yml" "seccomp_profile.json" "jobs/screenshot.py" "jobs/pdf.py")
 
