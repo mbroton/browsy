@@ -1,6 +1,6 @@
 services:
   server:
-    image: ghcr.io/mbroton/browsy/server:v0.0.5
+    image: ghcr.io/mbroton/browsy/server:v0.0.6
     command: browsy server --host 0.0.0.0 --port 8000
     restart: unless-stopped
     user: browsyuser
@@ -19,7 +19,7 @@ services:
       retries: 3
 
   worker:
-    image: ghcr.io/mbroton/browsy/worker:v0.0.5
+    image: ghcr.io/mbroton/browsy/worker:v0.0.6
     command: browsy worker
     restart: unless-stopped
     user: browsyuser
