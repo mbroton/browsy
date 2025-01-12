@@ -1,165 +1,158 @@
 import asyncio
 import logging
+import signal
 import time
-import os
-from pathlib import Path
 from typing import Optional
 
 from playwright.async_api import (
-    async_playwright,
     PlaywrightContextManager,
     Browser,
+    Error as PlaywrightError,
 )
-import playwright._impl._errors
-import playwright.async_api
+from playwright._impl._errors import TargetClosedError
 
 from browsy import _database, _jobs
-
-_JOB_POLL_INTERVAL = 5
-_HEARTBEAT_LOG_INTERVAL = 600
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
-logger = logging.getLogger("worker-main")
+logger = logging.getLogger("worker")
+
+_JOB_POLL_INTERVAL = 5
+_HEARTBEAT_LOG_INTERVAL = 60
 
 
-async def worker_loop(
-    pw_ctx: PlaywrightContextManager,
-    db: _database.AsyncConnection,
-    name: str,
-    jobs_defs: dict[str, type[_jobs.BaseJob]],
-) -> None:
+async def _worker_loop(name: str, db_path: str, jobs_path: str) -> None:
+    worker_logger = logging.getLogger(name)
+
+    db = await _database.create_connection(db_path)
+    jobs_defs = _jobs.collect_jobs_defs(jobs_path)
     await _database.check_in_worker(db, name)
-    log = logging.getLogger(name)
-    log.info("Ready to work")
-    shutdown = False
-    last_heartbeat = time.monotonic()
-    browser: Optional[Browser] = None
-    current_job_task: Optional[asyncio.Task] = None
+
+    pw = await PlaywrightContextManager().start()
+    browser: Browser = await pw.chromium.launch(headless=True)
+    worker_logger.info("Browser launched and ready")
+
+    worker_heartbeat = time.monotonic()
+    job: Optional[_database.DBJob] = None
+    start_time: Optional[float] = None
 
     try:
-        browser = await pw_ctx.chromium.launch(headless=True)
+        while True:
+            job = await _database.get_next_job(db, name)
+            if not job:
+                if (
+                    time.monotonic() - worker_heartbeat
+                    >= _HEARTBEAT_LOG_INTERVAL
+                ):
+                    await _database.update_worker_activity(db, name)
+                    worker_heartbeat = time.monotonic()
+                worker_logger.debug(
+                    f"No jobs available, sleeping for {_JOB_POLL_INTERVAL}s"
+                )
+                await asyncio.sleep(_JOB_POLL_INTERVAL)
+                continue
 
-        while not shutdown:
-            timeref = time.monotonic()
+            worker_logger.info(f"Starting job {job.id} (type: {job.name})")
+
+            start_time = time.monotonic()
+            worker_heartbeat = time.monotonic()
+            ctx = await browser.new_context()
+            page = await ctx.new_page()
 
             try:
-                job = await _database.get_next_job(db, worker=name)
-                if not job:
-                    if timeref - last_heartbeat >= _HEARTBEAT_LOG_INTERVAL:
-                        log.info("Worker is alive and polling for jobs")
-                        await _database.update_worker_activity(db, name)
-                        last_heartbeat = timeref
-
-                    await asyncio.sleep(_JOB_POLL_INTERVAL)
-                    continue
-
-                last_heartbeat = timeref
-                log.info(f"Starting job {job.id} ({job.name!r})")
-                processing_time_start = time.monotonic()
-
-                try:
-                    async with await browser.new_context() as ctx:
-                        async with await ctx.new_page() as page:
-                            current_job_task = asyncio.create_task(
-                                jobs_defs[job.name](**job.input).execute(page)
-                            )
-                            output = await current_job_task
-
-                except (
-                    asyncio.CancelledError,
-                    playwright.async_api.Error,
-                ) as e:
-                    processing_time = _calculate_processing_time(
-                        processing_time_start
-                    )
-
-                    if isinstance(e, asyncio.CancelledError):
-                        log.exception(
-                            f"Job interrupted, marking {job.id} as failed"
-                        )
-                    else:
-                        log.exception(
-                            f"Browser error occurred for job {job.id}"
-                            " (marking as failed)"
-                        )
-
-                    await _cancel_task(current_job_task)
-                    job.status = _jobs.JobStatus.FAILED
-                    await _database.update_job_status(
-                        db, name, job.id, job.status, processing_time, None
-                    )
-                    shutdown = True
-                    break
-
-                except Exception:
-                    log.exception("Job execution failed")
-                    job.status = _jobs.JobStatus.FAILED
-
-                else:
-                    log.info(f"Job {job.id} is done")
-                    job.status = _jobs.JobStatus.DONE
-
-                processing_time = _calculate_processing_time(
-                    processing_time_start
+                output = await asyncio.create_task(
+                    jobs_defs[job.name](**job.input).execute(page)
                 )
-                output = output if job.status == _jobs.JobStatus.DONE else None
+                worker_logger.info(f"Job {job.id} completed successfully")
                 await _database.update_job_status(
-                    db, name, job.id, job.status, processing_time, output
+                    db,
+                    worker=name,
+                    job_id=job.id,
+                    status=_jobs.JobStatus.DONE,
+                    processing_time=_calc_processing_time(start_time),
+                    output=output,
                 )
+                job = None
+                start_time = None
 
-            except asyncio.CancelledError:
-                log.info("Shutting down worker (no jobs interrupted)")
-                shutdown = True
-                break
+            except PlaywrightError:
+                # We only catch PlaywrightError since they are somewhat expected
+                # (e.g. network issues, invalid URLs). Other exceptions like
+                # bugs in job implementation should crash the worker to surface
+                # the issue.
+                worker_logger.exception(
+                    f"Playwright error occurred for job {job.id}."
+                    " Marking job as failed."
+                )
+                await _database.update_job_status(
+                    db,
+                    worker=name,
+                    job_id=job.id,
+                    status=_jobs.JobStatus.FAILED,
+                    processing_time=_calc_processing_time(start_time),
+                    output=None,
+                )
+                job = None
+                start_time = None
+
+            finally:
+                await page.close()
+                await ctx.close()
+
+    except BaseException as e:
+        if job:
+            worker_logger.info(
+                f"Job {job.id} was in progress, marking as failed"
+            )
+            await _database.update_job_status(
+                db,
+                worker=name,
+                job_id=job.id,
+                status=_jobs.JobStatus.FAILED,
+                processing_time=(
+                    _calc_processing_time(start_time) if start_time else 0
+                ),
+                output=None,
+            )
+
+        # Don't propagate CancelledError since it's expected during shutdown
+        if not isinstance(e, asyncio.CancelledError):
+            raise
 
     finally:
-        await _cancel_task(current_job_task, log=log)
-
-        if browser:
-            await _shutdown_browser(browser, log=log)
+        await pw.stop()
+        await db.close()
 
 
-async def _cancel_task(
-    task: Optional[asyncio.Task], log: Optional[logging.Logger] = None
-) -> None:
-    log = log or logger
-    if task and not task.done():
-        task.cancel()
-        try:
-            await task
-        except Exception as e:
-            log.debug(f"Canceled task clean up error: {e!r}")
+def _calc_processing_time(s: float) -> int:
+    # Calculate job processing time in milliseconds
+    return round((time.monotonic() - s) * 1000)
 
 
-async def _shutdown_browser(
-    browser: Browser, timeout: float = 5.0, log: Optional[logging.Logger] = None
-) -> None:
-    log = log or logger
-    try:
-        await asyncio.wait_for(browser.close(), timeout=timeout)
-    except (asyncio.TimeoutError, playwright.async_api.Error) as e:
-        log.warning(f"Failed to close browser gracefully: {e!r}")
+def _shutdown(main_task: asyncio.Task, s: signal.Signals) -> None:
+    logger.info(f"Received shutdown signal {s.name!r}. Shutting down...")
+    main_task.cancel()
 
 
-def _calculate_processing_time(start_time: float) -> int:
-    return round((time.monotonic() - start_time) * 1000)
+def start_worker(name: str, db_path: str, jobs_path: str) -> None:
+    loop = asyncio.get_event_loop()
+    main_task = loop.create_task(_worker_loop(name, db_path, jobs_path))
 
-
-async def start_worker(
-    name: str, db_path: str, jobs_path: Optional[str] = None
-) -> None:
-    if not os.path.exists(db_path):
-        raise FileNotFoundError(db_path)
-
-    jobs_path = jobs_path or Path().absolute()
-    jobs_defs = _jobs.collect_jobs_defs(jobs_path)
-    conn = await _database.create_connection(db_path)
+    for s in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(s, lambda sig=s: _shutdown(main_task, sig))
 
     try:
-        async with async_playwright() as p:
-            await worker_loop(pw_ctx=p, db=conn, name=name, jobs_defs=jobs_defs)
+        loop.run_until_complete(main_task)
+    except Exception as e:
+        # TargetClosedError is expected when stopping worker during job execution
+        # since it's caused by browser context being closed. Other Playwright errors
+        # that occur during normal job execution are caught in the worker loop.
+        if not isinstance(e, TargetClosedError):
+            logger.error(
+                "Worker process is shutting down due to unexpected error"
+            )
+            raise
     finally:
-        await conn.close()
+        loop.close()

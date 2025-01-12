@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 import string
@@ -49,16 +48,11 @@ def worker(name: Optional[str]):
     from browsy._worker import start_worker
 
     worker_name = name or f"worker_{_get_random_chars(8)}"
-    try:
-        asyncio.run(
-            start_worker(
-                name=worker_name,
-                db_path=os.environ["BROWSY_DB_PATH"],
-                jobs_path=os.environ["BROWSY_JOBS_PATH"],
-            )
-        )
-    except KeyboardInterrupt:
-        logger.info(f"Worker {worker_name} shutting down")
+    start_worker(
+        worker_name,
+        db_path=os.environ["BROWSY_DB_PATH"],
+        jobs_path=os.environ["BROWSY_JOBS_PATH"],
+    )
 
 
 def _get_random_chars(length: int) -> str:
