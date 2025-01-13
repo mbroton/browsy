@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
 
-from browsy import _database, _jobs, __version__
+from browsy import _database, _jobs, _models, __version__
 from browsy import __name__ as pkg_name
 
 _JOBS_DEFS = _jobs.collect_jobs_defs(
@@ -132,10 +132,10 @@ async def get_job_result_by_job_id(
         "X-Job-Last-Updated": job.updated_at.isoformat(),
     }
 
-    if job.status in (_jobs.JobStatus.IN_PROGRESS, _jobs.JobStatus.PENDING):
+    if job.status in (_models.JobStatus.IN_PROGRESS, _models.JobStatus.PENDING):
         return Response(202, headers=headers)
 
-    if job.status == _jobs.JobStatus.FAILED:
+    if job.status == _models.JobStatus.FAILED:
         return Response(204, headers=headers)
 
     job_result = await _database.get_job_result_by_job_id(db_conn, job_id)

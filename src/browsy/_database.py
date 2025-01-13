@@ -1,11 +1,10 @@
-import json
 from datetime import datetime
-from typing import Literal, Optional, Union, List, Tuple
+from typing import Literal, Optional, List, Tuple
 
 import aiosqlite
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
-from browsy import _jobs
+from browsy import _models
 
 AsyncConnection = aiosqlite.Connection
 
@@ -38,27 +37,6 @@ CREATE TABLE IF NOT EXISTS outputs (
 );
 CREATE INDEX IF NOT EXISTS idx_outputs_job_id ON outputs(job_id);
 """
-
-
-class DBJobBase(BaseModel):
-    id: int
-    name: str
-    status: _jobs.JobStatus
-    created_at: datetime
-    updated_at: Optional[datetime]
-    worker: Optional[str]
-    processing_time: Optional[int]  # milliseconds
-
-
-class DBJob(DBJobBase):
-    input: dict
-
-    @field_validator("input", mode="before")
-    @classmethod
-    def json_str_output(cls, v: Union[str, dict]) -> dict:
-        if isinstance(v, str):
-            return json.loads(v)
-        return v
 
 
 class DBOutput(BaseModel):
@@ -96,23 +74,23 @@ async def create_job(
     conn: AsyncConnection,
     name: str,
     input_json: str,
-) -> DBJob:
+) -> _models.Job:
     async with conn.execute(
         """
         INSERT INTO jobs (name, input, status)
         VALUES (?, ?, ?)
         RETURNING id, created_at, updated_at, worker, processing_time
         """,
-        (name, input_json, _jobs.JobStatus.PENDING),
+        (name, input_json, _models.JobStatus.PENDING),
     ) as cursor:
         result = await cursor.fetchone()
 
     await conn.commit()
 
-    return DBJob(
+    return _models.Job(
         name=name,
         input=input_json,
-        status=_jobs.JobStatus.PENDING,
+        status=_models.JobStatus.PENDING,
         **result,
     )
 
@@ -120,7 +98,7 @@ async def create_job(
 async def get_job_by_id(
     conn: AsyncConnection,
     id_: int,
-) -> Optional[DBJob]:
+) -> Optional[_models.Job]:
     async with conn.execute(
         """
         SELECT id, name, input, status, created_at, updated_at, worker, processing_time
@@ -131,7 +109,7 @@ async def get_job_by_id(
     ) as cursor:
         result = await cursor.fetchone()
 
-    return DBJob(**result) if result else None
+    return _models.Job(**result) if result else None
 
 
 async def get_job_result_by_job_id(
@@ -151,7 +129,9 @@ async def get_job_result_by_job_id(
     return result["output"] if result else None
 
 
-async def get_next_job(conn: AsyncConnection, worker: str) -> Optional[DBJob]:
+async def get_next_job(
+    conn: AsyncConnection, worker: str
+) -> Optional[_models.Job]:
     # Acquires a reserved lock, blocking other write transactions
     await conn.execute("BEGIN IMMEDIATE")
 
@@ -159,7 +139,7 @@ async def get_next_job(conn: AsyncConnection, worker: str) -> Optional[DBJob]:
         f"""
         SELECT id, name, input, status, created_at, updated_at, worker, processing_time
         FROM jobs
-        WHERE status = '{_jobs.JobStatus.PENDING.value}'
+        WHERE status = '{_models.JobStatus.PENDING.value}'
         ORDER BY created_at ASC
         LIMIT 1
         """
@@ -171,12 +151,12 @@ async def get_next_job(conn: AsyncConnection, worker: str) -> Optional[DBJob]:
         await conn.rollback()
         return None
 
-    db_job = DBJob(**result)
+    db_job = _models.Job(**result)
 
     await conn.execute(
         f"""
         UPDATE jobs
-        SET status = '{_jobs.JobStatus.IN_PROGRESS.value}', updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now'), worker = ?
+        SET status = '{_models.JobStatus.IN_PROGRESS.value}', updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now'), worker = ?
         WHERE id = ?
         """,
         (worker, db_job.id),
@@ -185,7 +165,7 @@ async def get_next_job(conn: AsyncConnection, worker: str) -> Optional[DBJob]:
     await update_worker_activity(conn, worker, commit=False)
 
     await conn.commit()
-    db_job.status = _jobs.JobStatus.IN_PROGRESS
+    db_job.status = _models.JobStatus.IN_PROGRESS
     db_job.worker = worker
 
     return db_job
@@ -195,7 +175,7 @@ async def update_job_status(
     conn: AsyncConnection,
     worker: str,
     job_id: int,
-    status: Literal[_jobs.JobStatus.DONE, _jobs.JobStatus.FAILED],
+    status: Literal[_models.JobStatus.DONE, _models.JobStatus.FAILED],
     processing_time: int,
     output: Optional[bytes],
 ) -> None:
@@ -278,10 +258,10 @@ async def get_workers(
 
 async def get_jobs(
     conn: AsyncConnection,
-    status: Optional[_jobs.JobStatus] = None,
+    status: Optional[_models.JobStatus] = None,
     limit: Optional[int] = None,
     offset: Optional[int] = None,
-) -> Tuple[List[DBJob], int]:
+) -> Tuple[List[_models.JobBase], int]:
     limit = limit or 50
     offset = offset or 0
 
@@ -306,6 +286,6 @@ async def get_jobs(
     async with conn.execute(query, args) as cursor:
         rows = await cursor.fetchall()
 
-    jobs = [DBJobBase(**r) for r in rows]
+    jobs = [_models.JobBase(**r) for r in rows]
 
     return jobs, total_count

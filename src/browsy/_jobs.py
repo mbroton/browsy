@@ -1,6 +1,5 @@
 import logging
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import ClassVar, Union, Type
 from pathlib import Path
 
@@ -8,13 +7,6 @@ from playwright.async_api import Page
 from pydantic import BaseModel, ConfigDict
 
 logger = logging.getLogger(__name__)
-
-
-class JobStatus(str, Enum):
-    PENDING = "pending"
-    DONE = "done"
-    IN_PROGRESS = "in_progress"
-    FAILED = "failed"
 
 
 def collect_jobs_defs(path: Union[str, Path]) -> dict[str, Type["BaseJob"]]:

@@ -11,7 +11,7 @@ from playwright.async_api import (
 )
 from playwright._impl._errors import TargetClosedError
 
-from browsy import _database, _jobs
+from browsy import _database, _jobs, _models
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,7 +70,7 @@ async def _worker_loop(name: str, db_path: str, jobs_path: str) -> None:
                     db,
                     worker=name,
                     job_id=job.id,
-                    status=_jobs.JobStatus.DONE,
+                    status=_models.JobStatus.DONE,
                     processing_time=_calc_processing_time(start_time),
                     output=output,
                 )
@@ -90,7 +90,7 @@ async def _worker_loop(name: str, db_path: str, jobs_path: str) -> None:
                     db,
                     worker=name,
                     job_id=job.id,
-                    status=_jobs.JobStatus.FAILED,
+                    status=_models.JobStatus.FAILED,
                     processing_time=_calc_processing_time(start_time),
                     output=None,
                 )
