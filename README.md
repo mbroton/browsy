@@ -111,8 +111,8 @@ Example request:
   {
     "name": "screenshot",
     "parameters": {
-      // Job's parameters (see job definition shown above)
       "url": "https://example.com",
+      "html": null,
       "full_page": true
     }
   }
@@ -128,6 +128,7 @@ Example response:
     "html": null,
     "full_page": true
   },
+  "processing_time": null,
   "status": "pending",
   "created_at": "2024-12-30T15:02:04.720000",
   "updated_at": null,
@@ -149,6 +150,7 @@ Example response:
     "html": null,
     "full_page": true
   },
+  "processing_time": 1298,
   "status": "done",
   "created_at": "2024-12-30T15:06:39.204000",
   "updated_at": "2024-12-30T15:06:44.743000",
