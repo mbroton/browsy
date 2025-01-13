@@ -203,10 +203,6 @@ The dashboard updates automatically to show you the latest state of your system:
 3. Workers execute jobs in Docker containers
 4. Get results when ready
 
-## Documentation
-
-For detailed setup and usage, check out the [documentation](https://broton.dev/).
-
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
