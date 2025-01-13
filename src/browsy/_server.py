@@ -1,4 +1,5 @@
 import os
+import importlib.resources as resources
 from contextlib import asynccontextmanager
 from typing import Annotated, Optional
 from pathlib import Path
@@ -11,6 +12,7 @@ from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel
 
 from browsy import _database, _jobs, __version__
+from browsy import __name__ as pkg_name
 
 _JOBS_DEFS = _jobs.collect_jobs_defs(
     os.environ.get("BROWSY_JOBS_PATH", str(Path().absolute()))
@@ -72,7 +74,8 @@ app = FastAPI(
 )
 app.openapi = custom_openapi
 
-templates = Jinja2Templates(directory="src/browsy/templates")
+template_dir = resources.files(pkg_name) / "templates"
+templates = Jinja2Templates(directory=template_dir)
 
 
 async def get_db(request: Request):
