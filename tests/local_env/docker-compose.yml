@@ -1,0 +1,40 @@
+services:
+  server:
+    image: browsy-server-local
+    command: browsy server --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    user: browsyuser
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${JOBS_PATH:-./../../quickstart/jobs}:/server/jobs
+      - browsy_data:/data
+    environment:
+      - BROWSY_DB_PATH=/data/browsy.db
+      - BROWSY_JOBS_PATH=/server/jobs
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    image: browsy-worker-local
+    command: browsy worker
+    restart: unless-stopped
+    user: browsyuser
+    volumes:
+      - ${JOBS_PATH:-./../../quickstart/jobs}:/worker/jobs
+      - browsy_data:/data
+    ipc: host
+    security_opt:
+      - "seccomp=${PWD}/seccomp_profile.json"
+    environment:
+      - BROWSY_DB_PATH=/data/browsy.db
+      - BROWSY_JOBS_PATH=/worker/jobs
+    depends_on:
+      server:
+        condition: service_healthy
+
+volumes:
+  browsy_data:
