@@ -92,7 +92,7 @@ class JobRequest(BaseModel):
     parameters: dict
 
 
-@app.post("/api/v1/jobs", response_model=_database.DBJob, tags=["jobs"])
+@app.post("/api/v1/jobs", response_model=_models.Job, tags=["jobs"])
 async def submit_job(
     r: JobRequest,
     db_conn: Annotated[_database.AsyncConnection, Depends(get_db)],
@@ -108,7 +108,7 @@ async def submit_job(
     return await _database.create_job(db_conn, r.name, job.model_dump_json())
 
 
-@app.get("/api/v1/jobs/{job_id}", response_model=_database.DBJob, tags=["jobs"])
+@app.get("/api/v1/jobs/{job_id}", response_model=_models.Job, tags=["jobs"])
 async def get_job_by_id(
     job_id: int, db_conn: Annotated[_database.AsyncConnection, Depends(get_db)]
 ):
