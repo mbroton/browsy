@@ -82,16 +82,20 @@ pip install browsy
 Here's how you can use it:
 ```python
 from browsy import BrowsyClient
+# Also available:
+# from browsy import AsyncBrowsyClient
 
-client = BrowsyClient("http://127.0.0.1")
-job_id = client.submit_job("screenshot", {
+client = BrowsyClient(base_url="http://localhost:8000")
+
+job = client.create_job(name="screenshot", parameters={
     "url": "https://example.com",
     "full_page": True
 })
-screenshot = client.get_result(job_id=job_id)
 
-with open("screenshot.png", "wb") as f:
-    f.write(screenshot)
+result = client.get_job_output(job_id=job.id)
+if result:
+  with open("screenshot.png", "wb") as f:
+      f.write(result)
 ```
 
 This example demonstrates how to submit a screenshot job, retrieve the result, and save it locally.
