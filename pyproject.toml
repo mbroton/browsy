@@ -1,6 +1,6 @@
 [project]
 name = "browsy"
-version = "0.0.6"
+version = "0.0.7"
 description = "Playwright-based browser automation service with HTTP API and Docker support"
 authors = [
     { name = "Michal Broton", email = "michal@broton.dev" }
@@ -67,3 +67,4 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/browsy"]
+exclude = ["tests*"]
